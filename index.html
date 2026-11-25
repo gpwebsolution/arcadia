@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport responsivo: base para o layout funcionar bem em celulares -->
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ARCADIA · Jogos online grátis, sem login</title>
+  <meta name="description" content="Mais de 70 jogos grátis direto no navegador. Sem login, sem instalar, sem enrolação.">
+  <!-- Logotipo oficial (crop do images/arcadia.png) -->
+  <link rel="icon" type="image/png" href="images/arcadia-icon.png">
+  <link rel="apple-touch-icon" href="images/arcadia-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- HEADER FIXO/STICKY: fica no topo mesmo durante a rolagem.
+       O botão hambúrguer e a barra de progresso são injetados por js/ui.js. -->
+  <header class="top"><div class="wrap">
+    <a class="logo" href="index.html" aria-label="ARCADIA — página inicial"><img src="images/arcadia-logo.png" alt="ARCADIA" width="462" height="320" decoding="async"></a>
+    <!-- Busca instantânea: filtra por nome, descrição ou id (atalho: tecla /) -->
+    <label class="search"><input id="q" type="search" placeholder="Buscar jogo…  ( / )" autocomplete="off" aria-label="Buscar jogo"></label>
+  </div></header>
+
+  <main class="wrap">
+    <!-- DESTAQUE DO DIA: preenchido por portal.js com um jogo escolhido pela data -->
+    <section class="hero" id="hero"></section>
+
+    <!-- CONTINUE JOGANDO: campanhas com progresso salvo. Oculto quando vazio. -->
+    <section class="resume" id="resume" hidden></section>
+
+    <!-- FILTROS: Todos / Recentes / Favoritos + categorias. Gerado pelo portal.js -->
+    <nav class="chips" id="chips" aria-label="Filtros de jogos"></nav>
+
+    <!-- TÍTULO DA LISTA + CONTADOR -->
+    <div class="sec"><h2 id="title">Todos os jogos</h2><span id="count"></span></div>
+
+    <!-- GRADE DE JOGOS: cards gerados dinamicamente -->
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <!-- Rodapé tradicional. O menu fixo de navegação (dock) é criado pelo ui.js. -->
+  <footer><div class="wrap">Feito com HTML, CSS e JS puro · Sem login, sem anúncios, seus recordes ficam salvos no seu navegador.</div></footer>
+
+  <!-- Ordem importante:
+       common.js  -> utilidades, som, efeitos e armazenamento local;
+       catalog.js -> lista de todos os jogos;
+       ui.js      -> menu lateral animado + dock fixo + progresso de scroll;
+       portal.js  -> lógica exclusiva da home. -->
+  <script src="js/common.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <!-- Na página do jogo travamos o zoom por gesto para não atrapalhar o toque nos controles.
+       O menu e os botões continuam acessíveis. -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Jogo · ARCADIA</title>
+  <meta name="description" content="Jogue grátis no ARCADIA, sem login e sem instalar nada.">
+  <link rel="icon" type="image/png" href="images/arcadia-icon.png">
+  <link rel="apple-touch-icon" href="images/arcadia-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- HEADER FIXO: o menu hambúrguer é injetado por js/ui.js -->
+  <header class="top"><div class="wrap"><a class="logo" href="index.html" aria-label="ARCADIA — página inicial"><img src="images/arcadia-logo.png" alt="ARCADIA" width="462" height="320" decoding="async"></a></div></header>
+
+  <main class="gwrap">
+    <!-- Migalhas de pão: voltar para a home + categoria do jogo -->
+    <div class="crumbs"><a class="back" href="index.html">← Todos os jogos</a><span id="gcat" style="color:var(--mut)"></span></div>
+
+    <!-- MOLDURA DO JOGO: HUD (nome, pontos, recorde, botões) + palco -->
+    <section class="frame" id="frame">
+      <div class="hud">
+        <div class="ttl" id="gname"></div>
+        <div class="stat"><small>Pontos</small><b id="sc">0</b></div>
+        <div class="stat"><small>Recorde</small><b id="bs">–</b></div>
+        <button class="ib" id="home" title="Voltar para a home" aria-label="Voltar para a home">🏠</button>
+        <button class="ib" id="pause" title="Pausar / continuar (P)" aria-label="Pausar ou continuar o jogo">⏸</button>
+        <button class="ib" id="full" title="Tela cheia" aria-label="Tela cheia">⛶</button>
+      </div>
+      <!-- stage = onde o jogo é desenhado; ov = overlay de início/fim de jogo -->
+      <div class="stagewrap"><div class="stage" id="stage"></div><div class="ov" id="ov"></div></div>
+      <!-- Controles de toque (setas/A) são inseridos pelo kit do jogo -->
+      <div class="padhost" id="padhost"></div>
+    </section>
+
+    <!-- Informações textuais do jogo -->
+    <section class="info">
+      <div class="panel"><h3>Sobre</h3><p id="ginfo"></p></div>
+      <div class="panel"><h3>Como jogar</h3><p id="ghow"></p></div>
+    </section>
+
+    <!-- Sugestões da mesma categoria -->
+    <div class="sec"><h2>Você também pode gostar</h2></div>
+    <div class="grid" id="rel"></div>
+  </main>
+
+  <!-- ABA DE CONFIGURAÇÕES: fora do <main> para o position:fixed usar a viewport
+       (o main tem animação com transform, que criaria um bloco de contenção). -->
+  <div class="cfg-wrap" id="cfg" hidden>
+    <div class="cfg-card" role="dialog" aria-modal="true" aria-labelledby="cfgTitle">
+      <div class="cfg-head">
+        <h2 id="cfgTitle">Ajustes do jogo</h2>
+        <button class="cfg-x" id="cfgClose" type="button" aria-label="Fechar configurações">✕</button>
+      </div>
+      <div class="cfg-body" id="cfgBody"></div>
+      <div class="cfg-foot">
+        <button class="gb" id="cfgReset" type="button">Restaurar padrão</button>
+        <button class="gb pri" id="cfgRestart" type="button">Aplicar e reiniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ordem importante: catálogo disponível antes do player; ui.js cuida do menu. -->
+  <script src="js/common.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/player.js"></script>
+</body>
+</html>
