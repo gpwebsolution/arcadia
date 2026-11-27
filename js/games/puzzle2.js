@@ -4,22 +4,48 @@
    Jogos deste arquivo: Sudoku, Doces em Fila (match-3), Tubos de Cor,
    Empurra Caixas e Caca-Palavras. Tambem usam DOM + a funcao fit() para
    manter as grades proporcionais em qualquer tela.
+
+   O visual segue a arena compartilhada (A.arena), com cabecalho, estatisticas,
+   tabuleiro e rodape com a marca GPWeb.
    ============================================================================= */
 (function () {
 const A = Arcadia;
 const fit = (n, max, pad) => Math.max(22, Math.min(max, Math.floor((Math.min(innerWidth, 560) - (pad || 60)) / n)));
+const setStat = (el, value) => { if (el && el.textContent !== String(value)) el.textContent = value; };
 
 // Sudoku: campanha de 40 grades com mais lacunas a cada fase.
 A.register('sudoku', K => {
   K.low = true; K.fmt = n => n + 's';
+  const ui = A.arena(K, {
+    icon: '🧮', title: 'Sudoku', kind: 'puzzle',
+    sub: 'Preencha 1–9 sem repetir em linhas, colunas e quadrados.'
+  });
+  const timeEl = A.arenaStat(ui.stats, 'Tempo', '⏱');
+  const emptyEl = A.arenaStat(ui.stats, 'Vazias', '▢');
+  const phaseEl = A.arenaStat(ui.stats, 'Fase', '📖');
+
   const C = A.campaign(K, 40);
-  const sz = fit(9, 44, 50);
-  const info = A.el('div', 'msg', '', K.root), box = A.el('div', '', '', K.root); box.style.cssText = `display:grid;grid-template-columns:repeat(9,${sz}px);gap:0;border:3px solid #9aa0c8;border-radius:6px;overflow:hidden`;
+  const sz = fit(9, 44, 90);
+  const hint = A.el('p', 'arena-hint', 'Selecione uma célula e use o teclado numérico ou os botões.', ui.body);
+  const box = A.el('div', 'pz-board pz-sudoku', null, ui.body);
+  const pad = A.el('div', 'pz-numpad', '', ui.foot);
   let g, given, sel = null, t = 0, started = false, locked = false, cells = [];
   const sh = (arr, random) => { const copy = arr.slice(); for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]]; } return copy; };
   const bad = (r, c) => { const v = g[r][c]; if (!v) return false; for (let i = 0; i < 9; i++) { if (i != c && g[r][i] == v) return true; if (i != r && g[i][c] == v) return true; } const br = r - r % 3, bc = c - c % 3; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if ((br + i != r || bc + j != c) && g[br + i][bc + j] == v) return true; return false; };
-  const draw = () => cells.forEach((b, i) => { const r = Math.floor(i / 9), c = i % 9, v = g[r][c], s = sel && sel[0] == r && sel[1] == c, rel = sel && (sel[0] == r || sel[1] == c);
-    b.textContent = v || ''; b.style.cssText = `width:${sz}px;height:${sz}px;font-size:${sz * .5}px;font-weight:${given[r][c] ? 800 : 500};color:${bad(r, c) ? '#ff4d6d' : given[r][c] ? '#fff' : '#7ec8ff'};background:${s ? '#4c3bd0' : rel ? 'rgba(255,255,255,.1)' : (Math.floor(r / 3) + Math.floor(c / 3)) % 2 ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.08)'};border-right:${c % 3 == 2 && c < 8 ? 2 : 1}px solid rgba(255,255,255,.2);border-bottom:${r % 3 == 2 && r < 8 ? 2 : 1}px solid rgba(255,255,255,.2)`; });
+  const emptyCount = () => g.reduce((total, row) => total + row.filter(v => !v).length, 0);
+  const draw = () => {
+    cells.forEach((b, i) => {
+      const r = Math.floor(i / 9), c = i % 9, v = g[r][c];
+      const isSel = sel && sel[0] == r && sel[1] == c;
+      const rel = sel && !isSel && (sel[0] == r || sel[1] == c || (Math.floor(sel[0] / 3) == Math.floor(r / 3) && Math.floor(sel[1] / 3) == Math.floor(c / 3)));
+      b.textContent = v || '';
+      b.className = 'pz-sq' + (given[r][c] ? ' given' : '') + (isSel ? ' sel' : '') + (rel ? ' rel' : '') + (bad(r, c) ? ' bad' : '') + (c % 3 == 2 && c < 8 ? ' br' : '') + (r % 3 == 2 && r < 8 ? ' bb' : '');
+    });
+    setStat(timeEl, t + 's');
+    setStat(emptyEl, emptyCount());
+    setStat(phaseEl, C.level + '/40');
+    hint.textContent = C.tag + ' · ' + emptyCount() + ' células em branco.';
+  };
   const build = () => {
     const random = A.rng((0x9e3779b9 ^ (C.level * 0x85ebca6b)) >>> 0 || 1);
     const grp = () => sh([0, 1, 2], random).flatMap(g => sh([0, 1, 2], random).map(r => g * 3 + r));
@@ -28,14 +54,21 @@ A.register('sudoku', K => {
     g = sol.map(r => r.slice()); given = Array.from({ length: 9 }, () => Array(9).fill(true));
     const remove = 36 + Math.floor((C.level - 1) * 14 / 39); let removed = 0;
     while (removed < remove) { const r = Math.floor(random() * 9), c = Math.floor(random() * 9); if (g[r][c]) { g[r][c] = 0; given[r][c] = false; removed++; } }
-    sel = null; locked = false; box.innerHTML = ''; cells = [];
-    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) { const b = A.el('button', '', '', box); b.onclick = () => { if (locked) return; sel = [r, c]; draw(); }; cells.push(b); }
-    info.textContent = `${C.tag} · Preencha 1–9 sem repetir em linhas, colunas e quadrados.`;
+    sel = null; locked = false; started = false; t = 0;
+    box.style.setProperty('--cell', sz + 'px');
+    box.style.setProperty('--cols', 9);
+    box.innerHTML = ''; cells = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      const b = A.el('button', 'pz-sq', '', box);
+      b.type = 'button';
+      b.onclick = () => { if (locked) return; sel = [r, c]; A.sfx('click'); draw(); };
+      cells.push(b);
+    }
     draw();
   };
   const put = v => {
     if (locked || !sel || given[sel[0]][sel[1]]) return;
-    if (!started) { started = true; K.every(() => K.setScore(++t), 1000); }
+    if (!started) { started = true; K.every(() => { t++; K.setScore(t); draw(); }, 1000); }
     g[sel[0]][sel[1]] = v; A.sfx('click'); draw();
     if (g.every((row, r) => row.every((x, c) => x && !bad(r, c)))) {
       if (C.last) return C.finish('Campanha completa! 🧩', t);
@@ -43,13 +76,28 @@ A.register('sudoku', K => {
       C.advance('Mais lacunas', () => K.after(build, 700));
     }
   };
-  const pad = A.el('div', 'btns', null, K.root); for (let i = 1; i <= 9; i++) { const b = A.el('button', 'gb', i, pad); b.style.cssText = 'width:38px;padding:8px 0'; b.onclick = () => put(i); } A.el('button', 'gb', '⌫', pad).onclick = () => put(0);
+  for (let i = 1; i <= 9; i++) {
+    const b = A.el('button', 'pz-num', i, pad);
+    b.type = 'button';
+    b.onclick = () => put(i);
+  }
+  const erase = A.el('button', 'pz-num erase', '⌫', pad);
+  erase.type = 'button';
+  erase.onclick = () => put(0);
   K.on(window, 'keydown', e => { if (/^[1-9]$/.test(e.key)) put(+e.key); else if (e.key == 'Backspace' || e.key == 'Delete' || e.key == '0') put(0); else if (sel && !locked) { const d = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key]; if (d) { sel = [A.clamp(sel[0] + d[0], 0, 8), A.clamp(sel[1] + d[1], 0, 8)]; draw(); } } });
   build();
 });
 
 // Doces em Fila: troque vizinhos para formar tres ou mais; combos caem em cascata.
 A.register('match3', K => {
+  const ui = A.arena(K, {
+    icon: '🍬', title: 'Doces em Fila', kind: 'puzzle',
+    sub: 'Troque doces vizinhos e forme filas de três ou mais.'
+  });
+  const movesEl = A.arenaStat(ui.stats, 'Jogadas', '↔');
+  const metaEl = A.arenaStat(ui.stats, 'Meta', '🎯');
+  const phaseEl = A.arenaStat(ui.stats, 'Fase', '📖');
+
   const N = 8, G = ['🍎', '🍋', '🍇', '🍬', '🍓', '🥝'], sz = fit(N, 54, 110);
   const LEVELS = Array.from({ length: 40 }, (_, i) => ({
     moves: 20 + Math.floor(i * .35),
@@ -57,16 +105,34 @@ A.register('match3', K => {
     seed: (0x9e3779b9 ^ ((i + 1) * 0x85ebca6b)) >>> 0 || 1
   }));
   let b, sel = -1, busy = false, lvl = 0, moves = 20, earned = 0, target = 250, cells = [];
-  const info = A.el('div', 'msg', '', K.root), box = A.el('div', 'board', null, K.root); box.style.cssText = `grid-template-columns:repeat(${N},${sz}px);gap:3px`;
+  const hint = A.el('p', 'arena-hint', 'Clique num doce e depois num vizinho para trocar.', ui.body);
+  const box = A.el('div', 'pz-board pz-match', null, ui.body);
   const matches = () => { const s = new Set(); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x, v = b[i]; if (v < 0) continue; if (x < N - 2 && b[i + 1] == v && b[i + 2] == v) [0, 1, 2].forEach(k => s.add(i + k)); if (y < N - 2 && b[i + N] == v && b[i + 2 * N] == v) [0, 1, 2].forEach(k => s.add(i + k * N)); } return s; };
-  const draw = () => { cells.forEach((c, i) => { c.textContent = b[i] < 0 ? '' : G[b[i]]; c.style.cssText = `width:${sz}px;height:${sz}px;font-size:${sz * .62}px;background:${sel == i ? '#4c3bd0' : 'rgba(255,255,255,.07)'}`; }); info.textContent = `Nível ${lvl + 1}/${LEVELS.length} · Jogadas: ${moves} · Meta ${earned}/${target}`; };
+  const draw = () => {
+    cells.forEach((c, i) => {
+      c.textContent = b[i] < 0 ? '' : G[b[i]];
+      c.className = 'pz-candy' + (sel == i ? ' sel' : '') + (b[i] < 0 ? ' gone' : '');
+    });
+    setStat(movesEl, moves);
+    setStat(metaEl, earned + '/' + target);
+    setStat(phaseEl, (lvl + 1) + '/40');
+    hint.textContent = 'Nível ' + (lvl + 1) + ' de 40 · ' + moves + ' jogadas · meta ' + target + ' pontos.';
+  };
   const levelUp = () => { if (lvl == LEVELS.length - 1) return K.over('Todas as fases! 🎉', K.score); lvl++; K.banner('NÍVEL ' + (lvl + 1), 'Nova meta: ' + LEVELS[lvl].target); A.fx.confetti(120, true); K.after(newBoard, 700); };
   const newBoard = () => {
     const L = LEVELS[lvl]; moves = L.moves; target = L.target; earned = 0; sel = -1; busy = false;
     const random = A.rng(L.seed);
     do b = Array.from({ length: N * N }, () => Math.floor(random() * 6)); while (matches().size);
+    box.style.setProperty('--cell', sz + 'px');
+    box.style.setProperty('--cols', N);
+    box.style.setProperty('--gap', '3px');
     box.innerHTML = '';
-    cells = b.map((_, i) => { const c = A.el('button', 'cellb', '', box); c.onclick = () => click(i); return c; });
+    cells = b.map((_, i) => {
+      const c = A.el('button', 'pz-candy', '', box);
+      c.type = 'button';
+      c.onclick = () => click(i);
+      return c;
+    });
     draw();
   };
   const settle = (combo) => {
@@ -75,7 +141,7 @@ A.register('match3', K => {
     K.after(() => { for (let x = 0; x < N; x++) { let col = []; for (let y = N - 1; y >= 0; y--) if (b[y * N + x] >= 0) col.push(b[y * N + x]); while (col.length < N) col.push(A.rand(0, 5)); for (let y = N - 1, k = 0; y >= 0; y--, k++) b[y * N + x] = col[k]; } draw(); K.after(() => settle(combo + 1), 300); }, 280);
   };
   const click = i => {
-    if (busy) return; if (sel < 0) { sel = i; draw(); return; }
+    if (busy) return; if (sel < 0) { sel = i; A.sfx('click'); draw(); return; }
     const d = Math.abs(i - sel), ok = (d == 1 && Math.floor(i / N) == Math.floor(sel / N)) || d == N; if (!ok) { sel = i; draw(); return; }
     [b[i], b[sel]] = [b[sel], b[i]]; const a = sel; sel = -1; busy = true;
     if (matches().size) { moves--; draw(); K.after(() => settle(1), 150); } else { draw(); K.after(() => { [b[i], b[a]] = [b[a], b[i]]; busy = false; draw(); A.sfx('hit'); }, 250); }
@@ -86,24 +152,46 @@ A.register('match3', K => {
 // Tubos de Cor: mova as cores entre tubos ate cada tubo ficar com uma cor so.
 A.register('colorsort', K => {
   K.low = true; K.fmt = n => n + ' mov.';
+  const ui = A.arena(K, {
+    icon: '🧪', title: 'Tubos de Cor', kind: 'puzzle',
+    sub: 'Separe as cores, uma cor por tubo.'
+  });
+  const movesEl = A.arenaStat(ui.stats, 'Movimentos', '↔');
+  const colorsEl = A.arenaStat(ui.stats, 'Cores', '🎨');
+  const phaseEl = A.arenaStat(ui.stats, 'Fase', '📖');
+
   const PAL = ['#ff4d6d', '#ffd23f', '#3ddc84', '#4c7dff', '#b05cff', '#ff9f43', '#00e0f0', '#e5e7eb', '#ff6ec7', '#8a7dff'];
   const LEVELS = Array.from({ length: 40 }, (_, i) => ({
     colors: 4 + Math.floor(i * 6 / 39),
     seed: (0x9e3779b9 ^ ((i + 1) * 0x85ebca6b)) >>> 0 || 1
   }));
-  const info = A.el('div', 'msg', '', K.root), row = A.el('div', '', '', K.root); row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:540px';
+  const hint = A.el('p', 'arena-hint', 'Clique num tubo e depois no destino. Só despeje sobre a mesma cor ou num tubo vazio.', ui.body);
+  const row = A.el('div', 'pz-tubes', '', ui.body);
   let lvl = 0, NC = 4, tubes = [], sel = -1, moves = 0, total = 0, els = [];
-  const upd = () => info.textContent = `Nível ${lvl + 1}/${LEVELS.length} · ${moves} movimentos · Separe as cores!`;
-  const draw = () => els.forEach((e, i) => { e.style.cssText = `width:48px;height:170px;border-radius:0 0 24px 24px;border:3px solid ${sel == i ? '#ffd23f' : 'rgba(255,255,255,.35)'};border-top:0;display:flex;flex-direction:column-reverse;padding:3px;gap:3px;background:rgba(255,255,255,.04);transform:${sel == i ? 'translateY(-10px)' : ''};transition:.12s`; e.innerHTML = tubes[i].map(c => `<div style="height:36px;border-radius:10px;background:${PAL[c]}"></div>`).join(''); });
+  const upd = () => {
+    setStat(movesEl, moves);
+    setStat(colorsEl, NC);
+    setStat(phaseEl, (lvl + 1) + '/40');
+    hint.textContent = 'Nível ' + (lvl + 1) + ' de 40 · ' + moves + ' movimentos.';
+  };
+  const draw = () => els.forEach((e, i) => {
+    e.classList.toggle('sel', sel == i);
+    e.innerHTML = tubes[i].map(c => '<span class="pz-fluid" style="--c:' + PAL[c] + '"></span>').join('');
+  });
   const build = () => {
     const L = LEVELS[lvl]; NC = L.colors; moves = 0; sel = -1; row.innerHTML = '';
     const units = A.seededShuffle(Array.from({ length: NC * 4 }, (_, i) => i % NC), L.seed);
     tubes = Array.from({ length: NC + 2 }, (_, i) => i < NC ? units.slice(i * 4, i * 4 + 4) : []);
-    els = tubes.map((_, i) => { const e = A.el('button', '', '', row); e.onclick = () => click(i); return e; });
+    els = tubes.map((_, i) => {
+      const e = A.el('button', 'pz-tube', '', row);
+      e.type = 'button';
+      e.onclick = () => click(i);
+      return e;
+    });
     draw(); upd();
   };
   const click = i => {
-    if (sel < 0) { if (tubes[i].length) sel = i; draw(); return; }
+    if (sel < 0) { if (tubes[i].length) sel = i; A.sfx('click'); draw(); return; }
     if (sel != i) { const f = tubes[sel], t = tubes[i], c = f[f.length - 1]; if (t.length < 4 && (!t.length || t[t.length - 1] == c)) { while (f.length && f[f.length - 1] == c && t.length < 4) t.push(f.pop()); moves++; total++; K.setScore(total); A.sfx('pop'); } }
     sel = -1; draw(); upd();
     if (tubes.every(t => !t.length || (t.length == 4 && t.every(c => c == t[0])))) {
@@ -191,6 +279,14 @@ const sokobanLevel = (seed, boxCount, W, H, wallCount) => {
 
 // Empurra Caixas: 40 niveis; empurre cada caixa para uma meta, com desfazer.
 A.register('sokoban', K => {
+  const ui = A.arena(K, {
+    icon: '📦', title: 'Empurra Caixas', kind: 'puzzle',
+    sub: 'Empurre cada caixa até um ponto marcado.'
+  });
+  const movesEl = A.arenaStat(ui.stats, 'Movimentos', '↔');
+  const boxesEl = A.arenaStat(ui.stats, 'Caixas', '📦');
+  const phaseEl = A.arenaStat(ui.stats, 'Nível', '📖');
+
   const LV = [
     ['#######', '#.    #', '# $   #', '#  @  #', '#######'],
     ['########', '#      #', '# $ $  #', '# .@.  #', '########'],
@@ -213,31 +309,73 @@ A.register('sokoban', K => {
     if (level) LV.push(level);
   }
   let li = 0, W, goals, boxes, p, hist = [], moves = 0, sz = fit(8, 54, 60);
-  const info = A.el('div', 'msg', '', K.root), box = A.el('div', '', '', K.root); box.style.cssText = 'display:inline-grid;gap:2px';
-  const ctl = A.el('div', 'btns', null, K.root);
-  const undoBtn = A.el('button', 'gb', '↶', ctl); undoBtn.title = 'Desfazer'; undoBtn.setAttribute('aria-label', 'Desfazer'); undoBtn.onclick = () => undo();
-  const restartBtn = A.el('button', 'gb', '↻', ctl); restartBtn.title = 'Reiniciar nível'; restartBtn.setAttribute('aria-label', 'Reiniciar nível'); restartBtn.onclick = () => load();
-  const load = () => { const L = LV[li]; W = new Set(); goals = new Set(); boxes = new Set(); hist = []; moves = 0; sz = fit(L[0].length, 54, 60); L.forEach((r, y) => [...r].forEach((c, x) => { const k = x + ',' + y; if (c == '#') W.add(k); if (c == '.' || c == '+' || c == '*') goals.add(k); if (c == '$' || c == '*') boxes.add(k); if (c == '@' || c == '+') p = [x, y]; })); draw(); };
-  const draw = () => { const L = LV[li], w = L[0].length; box.style.gridTemplateColumns = `repeat(${w},${sz}px)`; box.innerHTML = ''; L.forEach((r, y) => [...r].forEach((_, x) => { const k = x + ',' + y, e = A.el('div', '', '', box); e.style.cssText = `width:${sz}px;height:${sz}px;display:grid;place-items:center;font-size:${sz * .66}px;border-radius:6px;background:${W.has(k) ? '#5a3a24' : 'rgba(255,255,255,.06)'}`; e.textContent = W.has(k) ? '🧱' : (p[0] == x && p[1] == y) ? '🧑' : boxes.has(k) ? (goals.has(k) ? '✅' : '📦') : goals.has(k) ? '🎯' : ''; })); info.textContent = `Nível ${li + 1}/${LV.length} · ${moves} movimentos`; };
-  const undo = () => { const h = hist.pop(); if (!h) return; p = h.p; boxes = h.b; moves--; draw(); };
+  const hint = A.el('p', 'arena-hint', 'Use as setas, WASD ou deslize. Z desfaz.', ui.body);
+  const box = A.el('div', 'pz-board pz-soko', '', ui.body);
+  const undoBtn = A.el('button', 'arena-btn ghost', '↶ Desfazer', ui.foot);
+  undoBtn.type = 'button';
+  undoBtn.onclick = () => undo();
+  const restartBtn = A.el('button', 'arena-btn ghost', '↻ Reiniciar', ui.foot);
+  restartBtn.type = 'button';
+  restartBtn.onclick = () => load();
+
+  const load = () => {
+    const L = LV[li]; W = new Set(); goals = new Set(); boxes = new Set(); hist = []; moves = 0;
+    sz = fit(L[0].length, 54, 60);
+    L.forEach((r, y) => [...r].forEach((c, x) => { const k = x + ',' + y; if (c == '#') W.add(k); if (c == '.' || c == '+' || c == '*') goals.add(k); if (c == '$' || c == '*') boxes.add(k); if (c == '@' || c == '+') p = [x, y]; }));
+    draw();
+  };
+  const draw = () => {
+    const L = LV[li], w = L[0].length;
+    box.style.setProperty('--cell', sz + 'px');
+    box.style.setProperty('--cols', w);
+    box.innerHTML = '';
+    L.forEach((r, y) => [...r].forEach((_, x) => {
+      const k = x + ',' + y, e = A.el('div', 'pz-soko-cell', '', box);
+      if (W.has(k)) e.classList.add('wall');
+      else if (goals.has(k)) e.classList.add('goal');
+      if (boxes.has(k)) e.classList.add('box', goals.has(k) ? 'on' : 'off');
+      if (p[0] == x && p[1] == y) e.classList.add('player');
+      e.textContent = W.has(k) ? '' : (p[0] == x && p[1] == y) ? '🧑' : boxes.has(k) ? (goals.has(k) ? '✅' : '📦') : goals.has(k) ? '🎯' : '';
+    }));
+    setStat(movesEl, moves);
+    setStat(boxesEl, [...goals].filter(g => boxes.has(g)).length + '/' + goals.size);
+    setStat(phaseEl, (li + 1) + '/' + LV.length);
+    hint.textContent = 'Nível ' + (li + 1) + ' de ' + LV.length + ' · ' + moves + ' movimentos.';
+  };
+  const undo = () => { const h = hist.pop(); if (!h) return; p = h.p; boxes = h.b; moves--; A.sfx('click'); draw(); };
   const move = (dx, dy) => {
     const nx = p[0] + dx, ny = p[1] + dy, k = nx + ',' + ny; if (W.has(k)) return; const nb = new Set(boxes);
     if (nb.has(k)) { const bk = (nx + dx) + ',' + (ny + dy); if (W.has(bk) || nb.has(bk)) return; nb.delete(k); nb.add(bk); }
     hist.push({ p: p.slice(), b: boxes }); boxes = nb; p = [nx, ny]; moves++; A.sfx('step'); draw();
-    if ([...goals].every(g => boxes.has(g))) { K.addScore(100); A.sfx('win'); A.fx.confetti(120, true); li++; if (li >= LV.length) return K.over('Todos os níveis! 🏆'); K.banner('NÍVEL ' + (li + 1) + '/' + LV.length, 'Bem jogado!'); K.after(load, 600); }
+    if ([...goals].every(g => boxes.has(g))) {
+      K.addScore(100); A.sfx('win'); A.fx.confetti(120, true); li++;
+      if (li >= LV.length) return K.over('Todos os níveis! 🏆');
+      K.banner('NÍVEL ' + (li + 1) + '/' + LV.length, 'Bem jogado!'); K.after(load, 600);
+    }
   };
-  K.onKey(c => { const m = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[c]; if (m) move(...m); }); K.on(window, 'keydown', e => { if (e.key == 'z' || e.key == 'u') undo(); });
+  K.onKey(c => { const m = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[c]; if (m) move(...m); });
+  K.on(window, 'keydown', e => { if (e.key == 'z' || e.key == 'u') undo(); });
   K.pad('arrows'); K.swipe(); load();
 });
 
 // Caca-Palavras: campanha de 40 grades com mais palavras e direcoes.
 A.register('wordsearch', K => {
   K.low = true; K.fmt = n => n + 's';
+  const ui = A.arena(K, {
+    icon: '🔎', title: 'Caça-Palavras', kind: 'puzzle',
+    sub: 'Encontre todas as palavras escondidas na grade.'
+  });
+  const timeEl = A.arenaStat(ui.stats, 'Tempo', '⏱');
+  const wordsEl = A.arenaStat(ui.stats, 'Palavras', '🔤');
+  const phaseEl = A.arenaStat(ui.stats, 'Fase', '📖');
+
   const C = A.campaign(K, 40);
   const POOL = ['CASA', 'GATO', 'BOLA', 'LIVRO', 'PRAIA', 'MUNDO', 'FESTA', 'JOGAR', 'NUVEM', 'PEIXE', 'TIGRE', 'ZEBRA', 'PIANO', 'ROUPA', 'SONHO', 'VENTO', 'TERRA', 'RADIO', 'AMIGO', 'CIDADE', 'FLOR', 'ESCOLA', 'JANELA', 'MUSICA', 'NOITE', 'CAMPO'];
   const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1], [-1, 0], [0, -1]];
   let N = 10, sz = 32, words = [], g = [], found = new Set(), hl = new Set(), a = -1, t = 0, started = false, locked = false, cells = [];
-  const list = A.el('div', 'msg', '', K.root), box = A.el('div', 'board', null, K.root);
+  const hint = A.el('p', 'arena-hint', 'Toque na primeira e na última letra da palavra.', ui.body);
+  const list = A.el('div', 'pz-words', '', ui.body);
+  const box = A.el('div', 'pz-board pz-word', null, ui.body);
   const make = (seed, n, count, dirs) => {
     for (let att = 0; att < 80; att++) {
       const random = A.rng((seed + att * 0x9e3779b1) >>> 0 || 1);
@@ -261,8 +399,15 @@ A.register('wordsearch', K => {
     return null;
   };
   const draw = () => {
-    cells.forEach((c, i) => { c.textContent = g[i]; c.style.cssText = `width:${sz}px;height:${sz}px;font-size:${sz * .5}px;background:${a == i ? '#4c3bd0' : hl.has(i) ? '#3a9d5d' : 'rgba(255,255,255,.07)'}`; });
-    list.innerHTML = `<b>${C.tag}</b> · ` + words.map(w => `<span style="margin:0 6px;${found.has(w) ? 'text-decoration:line-through;opacity:.45' : ''}">${w}</span>`).join('');
+    cells.forEach((c, i) => {
+      c.textContent = g[i];
+      c.className = 'pz-letter' + (a == i ? ' sel' : '') + (hl.has(i) ? ' found' : '');
+    });
+    list.innerHTML = words.map(w => '<span class="pz-word' + (found.has(w) ? ' found' : '') + '">' + w + '</span>').join('');
+    setStat(timeEl, t + 's');
+    setStat(wordsEl, found.size + '/' + words.length);
+    setStat(phaseEl, C.level + '/40');
+    hint.textContent = C.tag + ' · encontre ' + words.length + ' palavras.';
   };
   const build = () => {
     const lvl = C.level;
@@ -272,16 +417,24 @@ A.register('wordsearch', K => {
     const seed = (0x9e3779b9 ^ (lvl * 0x85ebca6b)) >>> 0 || 1;
     const made = make(seed, N, count, dirs) || make(seed ^ 0x9e3779b9, N, Math.min(count, 6), DIRS.slice(0, 2));
     words = made ? made.picked : []; g = made ? made.grid : Array(N * N).fill('A');
-    found = new Set(); hl = new Set(); a = -1; locked = false;
+    found = new Set(); hl = new Set(); a = -1; locked = false; started = false; t = 0;
     sz = Math.max(18, Math.min(38, Math.floor((Math.min(innerWidth, 560) - 100) / N)));
-    box.style.cssText = `grid-template-columns:repeat(${N},${sz}px);gap:2px`; box.innerHTML = '';
-    cells = g.map((_, i) => { const c = A.el('button', 'cellb', '', box); c.onclick = () => click(i); return c; });
+    box.style.setProperty('--cell', sz + 'px');
+    box.style.setProperty('--cols', N);
+    box.style.setProperty('--gap', '2px');
+    box.innerHTML = '';
+    cells = g.map((_, i) => {
+      const c = A.el('button', 'pz-letter', '', box);
+      c.type = 'button';
+      c.onclick = () => click(i);
+      return c;
+    });
     draw();
   };
   const click = i => {
     if (locked) return;
-    if (!started) { started = true; K.every(() => K.setScore(++t), 1000); }
-    if (a < 0) { a = i; draw(); return; }
+    if (!started) { started = true; K.every(() => { t++; K.setScore(t); draw(); }, 1000); }
+    if (a < 0) { a = i; A.sfx('click'); draw(); return; }
     const x1 = a % N, y1 = Math.floor(a / N), x2 = i % N, y2 = Math.floor(i / N), dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1), L = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)); a = -1;
     if (L && (x2 - x1 == 0 || y2 - y1 == 0 || Math.abs(x2 - x1) == Math.abs(y2 - y1))) {
       const cs = Array.from({ length: L + 1 }, (_, k) => (y1 + dy * k) * N + x1 + dx * k), s = cs.map(c => g[c]).join(''), w = words.find(w => w == s || w == [...s].reverse().join(''));
@@ -297,7 +450,6 @@ A.register('wordsearch', K => {
     }
     draw();
   };
-  A.el('p', 'msg', 'Toque na primeira e na última letra da palavra.', K.root).style.cssText = 'font-size:13px;color:#9aa0c8';
   build();
 });
 })();

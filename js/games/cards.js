@@ -30,11 +30,21 @@ const row = (root, label) => {
 const btn = (p, t, fn, pri) => { const b = A.el('button', 'gb' + (pri ? ' pri' : ''), t, p); b.onclick = fn; return b; };
 
 /* Mesa de cassino compartilhada pelos jogos de cartas/dados.
-   Cria a moldura de feltro, o trilho dourado e a marca GPWeb como detalhe. */
-function table(K, variant) {
-  const wrap = A.el('div', 'game-table gt-' + (variant || 'cards'), null, K.root);
-  A.el('div', 'gt-rail', '', wrap);
-  return A.el('div', 'gt-body', '', wrap);
+   Cria a arena moderna (cabeçalho + assinatura GPWeb) em volta da moldura de
+   feltro, do trilho dourado e do corpo do jogo. */
+function table(K, variant, opts) {
+  opts = opts || {};
+  const wrap = A.el('div', 'arena arena--cards', '', K.root);
+  const head = A.el('div', 'arena-head', '', wrap);
+  A.el('div', 'arena-ico', opts.icon || '🃏', head);
+  const title = A.el('div', 'arena-title', '', head);
+  A.el('b', '', opts.title || '', title);
+  A.el('small', '', opts.sub || '', title);
+  const felt = A.el('div', 'game-table gt-' + (variant || 'cards'), null, wrap);
+  A.el('div', 'gt-rail', '', felt);
+  const body = A.el('div', 'gt-body', '', felt);
+  A.el('div', 'arena-brand', '<img src="images/gpweb.png" alt=""> GPWeb', wrap);
+  return body;
 }
 
 /* dado 3D reutilizável (CSS) */
@@ -66,7 +76,7 @@ function makeDie(size) {
 
 // Vinte e Um: fichas ficticias, pedir/parar/dobrar e blackjack paga mais.
 A.register('blackjack', K => {
-  const T = table(K, 'blackjack');
+  const T = table(K, 'blackjack', { icon: '🂡', title: 'Vinte e Um', sub: 'Fichas fictícias · pedir, parar ou dobrar' });
   let bank = 100, d, ph, dh, bet; const info = A.el('div', 'msg', '', T), dr = row(T, 'CASA'), pr = row(T, 'VOCÊ'), ctl = A.el('div', 'btns', null, T);
   const bankEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Fichas</small><b data-bank>100</b></span><span class="cb-item"><small>Aposta</small><b data-bet>0</b></span>', T);
   const bankVal = bankEl.querySelector('[data-bank]'), betVal = bankEl.querySelector('[data-bet]');
@@ -86,7 +96,7 @@ A.register('blackjack', K => {
 
 // Guerra de Cartas: 26 rodadas, a carta maior leva; as vale 14.
 A.register('war', K => {
-  const T = table(K, 'war');
+  const T = table(K, 'war', { icon: '⚔️', title: 'Guerra de Cartas', sub: 'Carta maior vence · Ás é a maior' });
   const d = deck(), msg = A.el('div', 'msg', 'Carta maior vence a rodada. Ás é a maior!', T), a = row(T, 'VOCÊ'), b = row(T, 'CPU'); let me = 0, cpu = 0, n = 0;
   const scoreEl = A.el('div', 'duel-score', '<span class="me">Você <b>0</b></span><span class="vs">×</span><span class="cpu"><b>0</b> CPU</span><span class="vs">·</span><span>Rodada <b>0</b>/26</span>', T);
   const scoreVals = scoreEl.querySelectorAll('b');
@@ -100,7 +110,7 @@ A.register('war', K => {
 
 // Maior ou Menor: aposte se a proxima carta sera maior ou menor que a atual.
 A.register('hilo', K => {
-  const T = table(K, 'hilo');
+  const T = table(K, 'hilo', { icon: '🔼', title: 'Maior ou Menor', sub: 'Acerte a próxima carta e mantenha a sequência' });
   let d = deck(), cur = d.pop(), streak = 0; const msg = A.el('div', 'msg', 'A próxima carta é maior ou menor?', T), r = row(T, 'CARTA ATUAL'), ctl = A.el('div', 'btns', null, T);
   const streakEl = A.el('div', 'duel-score', '<span class="me">Acertos <b>0</b></span><span class="vs">·</span><span>Sequência <b>0</b></span>', T);
   const streakVals = streakEl.querySelectorAll('b');
@@ -121,7 +131,7 @@ A.register('hilo', K => {
 
 // Caca-Niquel: tres rolos animados, fichas ficticias e tabela de pagamentos.
 A.register('slots', K => {
-  const T = table(K, 'slots');
+  const T = table(K, 'slots', { icon: '🎰', title: 'Caça-Níquel', sub: 'Três iguais pagam alto' });
   const S = ['🍒', '🍋', '🔔', '⭐', '7️⃣'], PAY = { '🍒': 50, '🍋': 30, '🔔': 60, '⭐': 100, '7️⃣': 200 }; let bank = 100, spinning = false; K.setScore(bank);
   const info = A.el('div', 'msg', 'Cada giro custa 10 fichas. Três iguais pagam muito!', T);
   const bankEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Fichas</small><b data-bank>100</b></span><span class="cb-item"><small>Giro</small><b>10</b></span>', T);
@@ -169,7 +179,7 @@ A.register('slots', K => {
 
 // Porquinho: role o dado 3D, acumule pontos e nao tire 1; primeiro a 50 vence.
 A.register('pig', K => {
-  const T = table(K, 'pig');
+  const T = table(K, 'pig', { icon: '🐷', title: 'Porquinho (Pig)', sub: 'Role o dado · primeiro a 50 vence' });
   let me = 0, cpu = 0, turn = 0, tp = 0, busy = false; const TARGET = 50;
   const info = A.el('div', 'msg', '', T);
   const scoreEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Você</small><b data-me>0</b></span><span class="cb-item"><small>CPU</small><b data-cpu>0</b></span><span class="cb-item"><small>Rodada</small><b data-tp>0</b></span>', T);
@@ -190,7 +200,7 @@ A.register('pig', K => {
 
 // Cara ou Coroa: moeda 3D animada, sequencia, historico e mesa tematica.
 A.register('coinflip', K => {
-  const T = table(K, 'coinflip');
+  const T = table(K, 'coinflip', { icon: '🪙', title: 'Cara ou Coroa', sub: 'Acerte em sequência e bata seu recorde' });
   const panel = A.el('div', 'coin-panel', null, T);
   const msg = A.el('div', 'msg', 'Cara ou coroa? Acerte em sequência!', panel);
   const stats = A.el('div', 'coin-stats', null, panel);
@@ -253,7 +263,7 @@ A.register('coinflip', K => {
 
 // Roleta europeia: 37 numeros, apostas em cor/par/faixa/numero e roda animada.
 A.register('roulette', K => {
-  const T = table(K, 'roulette');
+  const T = table(K, 'roulette', { icon: '🎡', title: 'Roleta Europeia', sub: 'Aposte na cor, par ou número e gire a roda' });
   const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
   const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
   const STEP = Math.PI * 2 / 37, TAU = Math.PI * 2, C = 200, RW = 185;
@@ -399,7 +409,7 @@ A.register('roulette', K => {
 
 // Dados Poker: cinco dados 3D, tres rolagens e oito categorias de pontuacao.
 A.register('dados', K => {
-  const T = table(K, 'dados');
+  const T = table(K, 'dados', { icon: '🎲', title: 'Dados Poker', sub: 'Cinco dados · três rolagens · oito categorias' });
   const CAT = [['Par', '👯', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 2) return v * 2; return 0; }], ['Dois pares', '👬', d => { const p = [1, 2, 3, 4, 5, 6].filter(v => d.filter(x => x == v).length >= 2); return p.length >= 2 ? p.reduce((s, v) => s + v * 2, 0) : 0; }], ['Trinca', '🎯', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 3) return v * 3; return 0; }], ['Sequência (30)', '🪜', d => { const s = [...new Set(d)].sort().join(''); return /12345|23456/.test(s) ? 30 : 0; }], ['Full house (25)', '🏠', d => { const c = [1, 2, 3, 4, 5, 6].map(v => d.filter(x => x == v).length); return c.includes(3) && c.includes(2) ? 25 : 0; }], ['Quadra (40)', '💥', d => [1, 2, 3, 4, 5, 6].some(v => d.filter(x => x == v).length >= 4) ? 40 : 0], ['Yahtzee (50)', '🏆', d => d.every(x => x == d[0]) ? 50 : 0], ['Soma', '➕', d => d.reduce((a, b) => a + b)]];
   let d = Array.from({ length: 5 }, () => A.rand(1, 6)), hold = [0, 0, 0, 0, 0], rolls = 0, used = {}, turns = 0, busy = false;
   const info = A.el('div', 'msg', 'Role até 3 vezes, toque nos dados para segurar e escolha uma categoria.', T);

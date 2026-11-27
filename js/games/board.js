@@ -10,16 +10,27 @@
 const A = Arcadia;
 const fit = (n, max, pad) => Math.max(24, Math.min(max, Math.floor((Math.min(innerWidth, 560) - (pad || 60)) / n)));
 
-/* Mesa de tabuleiro compartilhada: madeira escura, trilho e marca GPWeb. */
-const table = (K, variant) => {
-  const wrap = A.el('div', 'game-table gt-' + (variant || 'board'), null, K.root);
-  A.el('div', 'gt-rail', '', wrap);
-  return A.el('div', 'gt-body', '', wrap);
+/* Mesa de tabuleiro compartilhada: arena moderna + madeira escura, trilho e
+   marca GPWeb. O cabeçalho (ícone, título e subtítulo) mantém o mesmo padrão
+   visual dos jogos de reflexo/mente/puzzle do Lote 3. */
+const table = (K, variant, opts) => {
+  opts = opts || {};
+  const wrap = A.el('div', 'arena arena--board', '', K.root);
+  const head = A.el('div', 'arena-head', '', wrap);
+  A.el('div', 'arena-ico', opts.icon || '♟️', head);
+  const title = A.el('div', 'arena-title', '', head);
+  A.el('b', '', opts.title || '', title);
+  A.el('small', '', opts.sub || '', title);
+  const felt = A.el('div', 'game-table gt-' + (variant || 'board'), null, wrap);
+  A.el('div', 'gt-rail', '', felt);
+  const body = A.el('div', 'gt-body', '', felt);
+  A.el('div', 'arena-brand', '<img src="images/gpweb.png" alt=""> GPWeb', wrap);
+  return body;
 };
 
 // Jogo da Velha: 1P contra IA ou 2P local em melhor de 3.
 A.register('tictactoe', K => {
-  const T = table(K, 'tictactoe');
+  const T = table(K, 'tictactoe', { icon: '⭕', title: 'Jogo da Velha', sub: 'Três em linha · você contra a IA' });
   const L = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
   const W = b => { for (const [a, c, d] of L) if (b[a] && b[a] == b[c] && b[a] == b[d]) return b[a]; return b.every(Boolean) ? 'd' : 0; };
   const mm = (b, p) => { const w = W(b); if (w) return w == 'd' ? 0 : w == 'O' ? 1 : -1; let best = p == 'O' ? -2 : 2; b.forEach((v, i) => { if (!v) { b[i] = p; const s = mm(b, p == 'O' ? 'X' : 'O'); b[i] = 0; best = p == 'O' ? Math.max(best, s) : Math.min(best, s); } }); return best; };
@@ -105,7 +116,7 @@ A.register('tictactoe', K => {
 
 // Ligue 4: 1P contra IA ou 2P local em melhor de 3.
 A.register('connect4', K => {
-  const T = table(K, 'connect4');
+  const T = table(K, 'connect4', { icon: '🔴', title: 'Ligue 4', sub: 'Alinhe quatro discos antes da IA' });
   const R = 6, C = 7, lines = [];
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) { const l = []; for (let k = 0; k < 4; k++) l.push([r + dr * k, c + dc * k]); if (l.every(([y, x]) => y >= 0 && y < R && x >= 0 && x < C)) lines.push(l); }
   const winLine = (b, p) => lines.find(l => l.every(([r, c]) => b[r][c] == p)) || null;
@@ -207,7 +218,7 @@ A.register('connect4', K => {
 
 // Reversi: 1P contra IA ou 2P local. Vence quem tiver mais peças no fim.
 A.register('reversi', K => {
-  const T = table(K, 'reversi');
+  const T = table(K, 'reversi', { icon: '⚫', title: 'Reversi', sub: 'Cerque e vire as peças do adversário' });
   const D = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
   const top = [[100, -20, 10, 5], [-20, -50, -2, -2], [10, -2, 1, 1], [5, -2, 1, 0]], wt = (x, y) => top[y < 4 ? y : 7 - y][x < 4 ? x : 7 - x];
   const flips = (b, x, y, p) => { if (b[y * 8 + x]) return []; let out = []; for (const [dx, dy] of D) { let cx = x + dx, cy = y + dy; const t = []; while (cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && b[cy * 8 + cx] == -p) { t.push(cy * 8 + cx); cx += dx; cy += dy; } if (t.length && cx >= 0 && cx < 8 && cy >= 0 && cy < 8 && b[cy * 8 + cx] == p) out = out.concat(t); } return out; };
@@ -279,7 +290,7 @@ A.register('reversi', K => {
 
 // Codigo Secreto: quatro cores em dez tentativas, com feedback de posicao e cor.
 A.register('mastermind', K => {
-  const T = table(K, 'mastermind');
+  const T = table(K, 'mastermind', { icon: '🔐', title: 'Código Secreto', sub: 'Descubra as quatro cores em 10 tentativas' });
   K.low = true; K.fmt = n => n + ' tent.';
   const PAL = ['#ff4d6d', '#ffd23f', '#3ddc84', '#4c7dff', '#b05cff', '#ff9f43'], code = Array.from({ length: 4 }, () => A.rand(0, 5)); let cur = [], rows = 0;
   const msg = A.el('div', 'msg', 'Quebre o código de 4 cores em até 10 tentativas.', T);
@@ -317,7 +328,7 @@ A.register('mastermind', K => {
 
 // Pedra, Papel e Tesoura: sequencia de vitorias vale pontos; uma derrota encerra.
 A.register('rps', K => {
-  const T = table(K, 'rps');
+  const T = table(K, 'rps', { icon: '✂️', title: 'Pedra, Papel e Tesoura', sub: 'Monte a maior sequência de vitórias' });
   const O = [['🪨', 'Pedra'], ['📄', 'Papel'], ['✂️', 'Tesoura']];
   const msg = A.el('div', 'msg', 'Escolha! Sua sequência de vitórias vale pontos.', T);
   const scoreEl = A.el('div', 'duel-score board-score', '<span class="me">Sequência <b>0</b></span><span class="vs">·</span><span class="cpu">Recorde <b>0</b></span>', T);
@@ -359,7 +370,7 @@ A.register('rps', K => {
 
 // Batalha Naval: frota 8x8 escondida; afunde todos os navios no menor numero de tiros.
 A.register('battleship', K => {
-  const T = table(K, 'battleship');
+  const T = table(K, 'battleship', { icon: '🚢', title: 'Batalha Naval', sub: 'Afunde a frota escondida' });
   K.low = true; K.fmt = n => n + ' tiros';
   const N = 8, sz = fit(N, 44, 94), ships = [4, 3, 3, 2], g = Array(N * N).fill(-1), hit = Array(N * N).fill(0), left = ships.slice(); let shots = 0, sunk = 0;
   ships.forEach((len, id) => { for (;;) { const h = Math.random() < .5, x = A.rand(0, h ? N - len : N - 1), y = A.rand(0, h ? N - 1 : N - len), cs = Array.from({ length: len }, (_, k) => (y + (h ? 0 : k)) * N + x + (h ? k : 0)); if (cs.every(c => g[c] < 0)) { cs.forEach(c => g[c] = id); break; } } });
@@ -403,7 +414,7 @@ A.register('battleship', K => {
 
 // Mancala (Kalah): semeadura de sementes contra uma IA que simula jogadas.
 A.register('mancala', K => {
-  const T = table(K, 'mancala');
+  const T = table(K, 'mancala', { icon: '🥜', title: 'Mancala', sub: 'Semeie pedras e capture as do oponente' });
   let b = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0], turn = 0, busy = false;
   const own = t => t ? [7, 8, 9, 10, 11, 12] : [0, 1, 2, 3, 4, 5], store = t => t ? 13 : 6;
   const sow = (b, i, t) => { let n = b[i]; b[i] = 0; let j = i; while (n) { j = (j + 1) % 14; if (j == store(1 - t)) continue; b[j]++; n--; } const extra = j == store(t); if (!extra && own(t).includes(j) && b[j] == 1 && b[12 - j] > 0) { b[store(t)] += b[12 - j] + 1; b[j] = 0; b[12 - j] = 0; } return extra; };

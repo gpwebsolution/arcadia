@@ -192,6 +192,30 @@
     return element;
   };
 
+  /* Arena compartilhada dos jogos de DOM (puzzles, mente, reflexos).
+     Devolve os pontos de montagem para header, estatísticas, corpo e rodapé.
+     A marca GPWeb entra como detalhe discreto no rodapé da arena. */
+  A.arena = (K, options) => {
+    const opts = options || {};
+    const wrap = A.el('div', 'arena arena--' + (opts.kind || 'puzzle') + (opts.cls ? ' ' + opts.cls : ''), '', K.root);
+    const head = A.el('div', 'arena-head', '', wrap);
+    A.el('div', 'arena-ico', opts.icon || '🧩', head);
+    const title = A.el('div', 'arena-title', '', head);
+    A.el('b', '', opts.title || '', title);
+    A.el('small', '', opts.sub || '', title);
+    const stats = A.el('div', 'arena-stats', '', head);
+    const body = A.el('div', 'arena-body', '', wrap);
+    const foot = A.el('div', 'arena-foot', '', wrap);
+    A.el('div', 'arena-brand', '<img src="images/gpweb.png" alt=""> GPWeb', wrap);
+    return { wrap, head, title, stats, body, foot };
+  };
+
+  A.arenaStat = (parent, label, icon) => {
+    const box = A.el('div', 'arena-stat', '', parent);
+    A.el('small', '', (icon ? icon + ' ' : '') + label, box);
+    return A.el('b', '', '0', box);
+  };
+
   /* Escapa texto digitado pelo jogador antes de entrar em innerHTML.
      Usado pelo nome do ranking para evitar HTML acidental/malicioso. */
   A.esc = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
