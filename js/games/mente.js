@@ -15,7 +15,7 @@ const WL = ('COMPUTADOR TECLADO JOGADOR AVENTURA CAMINHO ESCOLA AMARELO CACHORRO
 const KB = ['QWERTYUIOP', 'ASDFGHJKL', '⏎ZXCVBNM⌫'];
 const keyboard = (root, onKey) => {
   const kb = A.el('div', '', '', root); kb.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:center'; const m = {};
-  KB.forEach(r => { const row = A.el('div', '', '', kb); row.style.cssText = 'display:flex;gap:5px'; [...r].forEach(ch => { const b = A.el('button', 'gb', ch, row); b.style.cssText = `padding:0;width:${Math.min(34, Math.floor((Math.min(innerWidth, 520) - 70) / 10))}px;height:42px;font-size:14px`; b.onclick = () => onKey(ch); m[ch] = b; }); });
+  KB.forEach(r => { const row = A.el('div', '', '', kb); row.style.cssText = 'display:flex;gap:5px'; [...r].forEach(ch => { const b = A.el('button', 'gb', ch, row); b.style.cssText = `padding:0;width:${Math.max(20, Math.min(34, Math.floor((Math.min(innerWidth, 520) - 100) / 10)))}px;height:42px;font-size:14px`; b.onclick = () => onKey(ch); m[ch] = b; }); });
   return m;
 };
 const physical = (K, fn) => K.on(window, 'keydown', e => { if (e.ctrlKey || e.metaKey || e.altKey || /INPUT/.test(e.target.tagName)) return; const k = e.key; if (/^[a-zA-Z]$/.test(k)) fn(k.toUpperCase()); else if (k == 'Enter') fn('⏎'); else if (k == 'Backspace') fn('⌫'); });

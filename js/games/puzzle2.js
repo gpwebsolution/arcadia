@@ -50,7 +50,7 @@ A.register('sudoku', K => {
 
 // Doces em Fila: troque vizinhos para formar tres ou mais; combos caem em cascata.
 A.register('match3', K => {
-  const N = 8, G = ['🍎', '🍋', '🍇', '🍬', '🍓', '🥝'], sz = fit(N, 54, 46);
+  const N = 8, G = ['🍎', '🍋', '🍇', '🍬', '🍓', '🥝'], sz = fit(N, 54, 110);
   const LEVELS = Array.from({ length: 40 }, (_, i) => ({
     moves: 20 + Math.floor(i * .35),
     target: Math.round((250 + i * 160 + i * i * 2.2) / 50) * 50,
@@ -214,7 +214,9 @@ A.register('sokoban', K => {
   }
   let li = 0, W, goals, boxes, p, hist = [], moves = 0, sz = fit(8, 54, 60);
   const info = A.el('div', 'msg', '', K.root), box = A.el('div', '', '', K.root); box.style.cssText = 'display:inline-grid;gap:2px';
-  const ctl = A.el('div', 'btns', null, K.root); A.el('button', 'gb', '↶ Desfazer', ctl).onclick = () => undo(); A.el('button', 'gb', '↻ Reiniciar nível', ctl).onclick = () => load();
+  const ctl = A.el('div', 'btns', null, K.root);
+  const undoBtn = A.el('button', 'gb', '↶', ctl); undoBtn.title = 'Desfazer'; undoBtn.setAttribute('aria-label', 'Desfazer'); undoBtn.onclick = () => undo();
+  const restartBtn = A.el('button', 'gb', '↻', ctl); restartBtn.title = 'Reiniciar nível'; restartBtn.setAttribute('aria-label', 'Reiniciar nível'); restartBtn.onclick = () => load();
   const load = () => { const L = LV[li]; W = new Set(); goals = new Set(); boxes = new Set(); hist = []; moves = 0; sz = fit(L[0].length, 54, 60); L.forEach((r, y) => [...r].forEach((c, x) => { const k = x + ',' + y; if (c == '#') W.add(k); if (c == '.' || c == '+' || c == '*') goals.add(k); if (c == '$' || c == '*') boxes.add(k); if (c == '@' || c == '+') p = [x, y]; })); draw(); };
   const draw = () => { const L = LV[li], w = L[0].length; box.style.gridTemplateColumns = `repeat(${w},${sz}px)`; box.innerHTML = ''; L.forEach((r, y) => [...r].forEach((_, x) => { const k = x + ',' + y, e = A.el('div', '', '', box); e.style.cssText = `width:${sz}px;height:${sz}px;display:grid;place-items:center;font-size:${sz * .66}px;border-radius:6px;background:${W.has(k) ? '#5a3a24' : 'rgba(255,255,255,.06)'}`; e.textContent = W.has(k) ? '🧱' : (p[0] == x && p[1] == y) ? '🧑' : boxes.has(k) ? (goals.has(k) ? '✅' : '📦') : goals.has(k) ? '🎯' : ''; })); info.textContent = `Nível ${li + 1}/${LV.length} · ${moves} movimentos`; };
   const undo = () => { const h = hist.pop(); if (!h) return; p = h.p; boxes = h.b; moves--; draw(); };
@@ -271,7 +273,7 @@ A.register('wordsearch', K => {
     const made = make(seed, N, count, dirs) || make(seed ^ 0x9e3779b9, N, Math.min(count, 6), DIRS.slice(0, 2));
     words = made ? made.picked : []; g = made ? made.grid : Array(N * N).fill('A');
     found = new Set(); hl = new Set(); a = -1; locked = false;
-    sz = Math.max(18, Math.min(38, Math.floor((Math.min(innerWidth, 560) - 40) / N)));
+    sz = Math.max(18, Math.min(38, Math.floor((Math.min(innerWidth, 560) - 100) / N)));
     box.style.cssText = `grid-template-columns:repeat(${N},${sz}px);gap:2px`; box.innerHTML = '';
     cells = g.map((_, i) => { const c = A.el('button', 'cellb', '', box); c.onclick = () => click(i); return c; });
     draw();

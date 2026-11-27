@@ -60,7 +60,7 @@
     const surprise = A.pick(surprisePool.length ? surprisePool : C);
     $('hero').style.setProperty('--h', A.hue(pick.id));
     $('hero').innerHTML = `
-      <div>
+      <div class="hero-copy">
         <small>🔥 Jogo do dia</small>
         <h1>${pick.name}</h1>
         <p>${pick.desc}</p>
@@ -68,11 +68,19 @@
           <span>${A.cats[pick.cat].icon} ${A.cats[pick.cat].name}</span>
           <span>✅ Grátis</span>
           <span>🚫 Sem login</span>
+          <span>🎁 Itens e poderes</span>
         </div>
-        <a class="btn" href="game.html?g=${pick.id}">▶ Jogar agora</a>
-        <a class="btn ghost" href="game.html?g=${surprise.id}">🎲 Surpreenda-me</a>
+        <div class="hero-actions">
+          <a class="btn" href="game.html?g=${pick.id}">▶ Jogar agora</a>
+          <a class="btn ghost" href="game.html?g=${surprise.id}">🎲 Surpreenda-me</a>
+        </div>
       </div>
-      <div class="big">${pick.icon}</div>`;
+      <div class="hero-visual">
+        <span class="hero-orb a"></span><span class="hero-orb b"></span>
+        ${pick.image
+          ? `<img src="${pick.image}" alt="${pick.name}" loading="eager" decoding="async">`
+          : `<div class="big">${pick.icon}</div>`}
+      </div>`;
   }
 
   /* ---------------------------------------------------------------------------
@@ -220,7 +228,12 @@
       ? list.map((g, i) => `
         <a class="card" style="--h:${A.hue(g.id)};--i:${Math.min(i, 18)}" href="game.html?g=${g.id}">
           <div class="thumb">
-            <span class="ico">${g.icon}</span>
+            ${g.image
+              ? `<img class="thumb-img" src="${g.image}" alt="${g.name}" loading="lazy" decoding="async">`
+              : `<span class="ico">${g.icon}</span>`}
+            <span class="thumb-shade"></span>
+            <span class="thumb-cat">${A.cats[g.cat].icon} ${A.cats[g.cat].name}</span>
+            <span class="thumb-play" aria-hidden="true">▶</span>
             <button class="fav ${favs.includes(g.id) ? 'on' : ''}" data-id="${g.id}"
                     type="button" aria-label="Favoritar ${g.name}" aria-pressed="${favs.includes(g.id)}">♥</button>
           </div>

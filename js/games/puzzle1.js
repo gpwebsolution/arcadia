@@ -14,7 +14,7 @@ const fit = (n, max, pad) => Math.max(24, Math.min(max, Math.floor((Math.min(inn
 
 // 2048: 40 fases com meta de pontos e limite de jogadas.
 A.register('2048', K => {
-  const sz = fit(4, 88, 70), COL = { 0: 'rgba(255,255,255,.06)', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61', 512: '#edc850', 1024: '#edc53f', 2048: '#edc22e' };
+  const sz = fit(4, 88, 130), COL = { 0: 'rgba(255,255,255,.06)', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61', 512: '#edc850', 1024: '#edc53f', 2048: '#edc22e' };
   const C = A.campaign(K, 40);
   let b = Array(16).fill(0), won = false, moves = 0, earned = 0, goal = 0, limit = 0, locked = false;
   const info = A.el('div', 'msg', '', K.root);
@@ -117,7 +117,7 @@ A.register('memory', K => {
   const show = (b, up) => { b.textContent = up ? b.dataset.e : '?'; b.style.background = up ? '#fff' : 'linear-gradient(135deg,#6b57ff,#4c3bd0)'; b.style.transform = up ? 'rotateY(0)' : ''; };
   const upd = () => info.textContent = `Nível ${lvl + 1}/${LEVELS.length} · ${moves} jogadas`;
   const build = () => {
-    const L = LEVELS[lvl]; pairs = L.pairs; moves = 0; found = 0; first = null; lock = false; sz = fit(L.cols, 90, 70) - 8;
+    const L = LEVELS[lvl]; pairs = L.pairs; moves = 0; found = 0; first = null; lock = false; sz = fit(L.cols, 90, 90) - 8;
     board.style.cssText = `grid-template-columns:repeat(${L.cols},${sz}px);gap:10px`; board.innerHTML = '';
     const E = A.seededShuffle(POOL, L.seed).slice(0, pairs), deck = A.seededShuffle(E.concat(E), L.seed ^ 0x9e3779b9);
     cells = deck.map(e => {
@@ -339,7 +339,7 @@ A.register('hanoi', K => {
 A.register('pegs', K => {
   K.low = true; K.fmt = n => n + ' mov.';
   const C = A.campaign(K, 40);
-  const sz = fit(7, 56, 60);
+  const sz = fit(7, 56, 110);
   const ok = (x, y) => x >= 0 && x < 7 && y >= 0 && y < 7 && !((x < 2 || x > 4) && (y < 2 || y > 4));
   const POS = [];
   for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (ok(x, y)) POS.push([x, y]);

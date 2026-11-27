@@ -14,9 +14,28 @@
 const A = Arcadia;
 const SU = ['♠', '♥', '♦', '♣'], RK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const deck = () => A.shuffle(SU.flatMap(s => RK.map((r, i) => ({ s, r, v: i + 1 }))));
-const cardEl = (c, p) => A.el('div', 'pcard' + (c ? (c.s == '♥' || c.s == '♦' ? ' red' : '') : ' back'), c ? `<span>${c.r}</span><span>${c.s}</span>` : '', p);
-const row = (root, label) => { const w = A.el('div', '', '', root); w.style.cssText = 'text-align:center'; A.el('small', '', label, w).style.color = '#9aa0c8'; const r = A.el('div', '', '', w); r.style.cssText = 'display:flex;gap:8px;justify-content:center;min-height:96px;flex-wrap:wrap;margin-top:4px'; return r; };
+const cardEl = (c, p) => {
+  if (!c) return A.el('div', 'pcard back', '', p);
+  const red = c.s == '♥' || c.s == '♦';
+  return A.el('div', 'pcard' + (red ? ' red' : ''),
+    `<span class="corner tl"><b>${c.r}</b><i>${c.s}</i></span>` +
+    `<span class="pip">${c.s}</span>` +
+    `<span class="corner br"><b>${c.r}</b><i>${c.s}</i></span>`, p);
+};
+const row = (root, label) => {
+  const w = A.el('div', 'card-row', '', root);
+  A.el('small', 'card-row-label', label, w);
+  return A.el('div', 'card-row-cards', '', w);
+};
 const btn = (p, t, fn, pri) => { const b = A.el('button', 'gb' + (pri ? ' pri' : ''), t, p); b.onclick = fn; return b; };
+
+/* Mesa de cassino compartilhada pelos jogos de cartas/dados.
+   Cria a moldura de feltro, o trilho dourado e a marca GPWeb como detalhe. */
+function table(K, variant) {
+  const wrap = A.el('div', 'game-table gt-' + (variant || 'cards'), null, K.root);
+  A.el('div', 'gt-rail', '', wrap);
+  return A.el('div', 'gt-body', '', wrap);
+}
 
 /* dado 3D reutilizável (CSS) */
 const PIP = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
@@ -47,12 +66,16 @@ function makeDie(size) {
 
 // Vinte e Um: fichas ficticias, pedir/parar/dobrar e blackjack paga mais.
 A.register('blackjack', K => {
-  let bank = 100, d, ph, dh, bet; const info = A.el('div', 'msg', '', K.root), dr = row(K.root, 'CASA'), pr = row(K.root, 'VOCÊ'), ctl = A.el('div', 'btns', null, K.root);
+  const T = table(K, 'blackjack');
+  let bank = 100, d, ph, dh, bet; const info = A.el('div', 'msg', '', T), dr = row(T, 'CASA'), pr = row(T, 'VOCÊ'), ctl = A.el('div', 'btns', null, T);
+  const bankEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Fichas</small><b data-bank>100</b></span><span class="cb-item"><small>Aposta</small><b data-bet>0</b></span>', T);
+  const bankVal = bankEl.querySelector('[data-bank]'), betVal = bankEl.querySelector('[data-bet]');
+  const sync = () => { bankVal.textContent = bank; betVal.textContent = bet || 0; };
   const val = h => { let t = h.reduce((s, c) => s + (c.v == 1 ? 11 : Math.min(10, c.v)), 0), a = h.filter(c => c.v == 1).length; while (t > 21 && a--) t -= 10; return t; };
-  const show = hide => { dr.innerHTML = ''; pr.innerHTML = ''; dh && dh.forEach((c, i) => cardEl(hide && i ? null : c, dr)); ph && ph.forEach(c => cardEl(c, pr)); if (ph) info.textContent = `Você: ${val(ph)}${hide ? '' : ' · Casa: ' + val(dh)} · Aposta: ${bet}`; };
+  const show = hide => { dr.innerHTML = ''; pr.innerHTML = ''; dh && dh.forEach((c, i) => cardEl(hide && i ? null : c, dr)); ph && ph.forEach(c => cardEl(c, pr)); if (ph) info.textContent = `Você: ${val(ph)}${hide ? '' : ' · Casa: ' + val(dh)} · Aposta: ${bet}`; sync(); };
   const betPhase = () => {
     K.setScore(bank); ctl.innerHTML = ''; dh = ph = null; show(); info.textContent = `Fichas: ${bank}. Faça sua aposta!`;
-    [10, 25, 50].forEach(b => { const x = btn(ctl, '🪙 ' + b, () => deal(b), 1); x.disabled = bank < b; }); btn(ctl, 'Sair e salvar', () => K.over('Você saiu com ' + bank + ' fichas', bank));
+    [10, 25, 50].forEach(b => { const x = btn(ctl, '🪙 ' + b, () => deal(b), 1); x.classList.add('chip-bet'); x.disabled = bank < b; }); btn(ctl, 'Sair e salvar', () => K.over('Você saiu com ' + bank + ' fichas', bank));
   };
   const finish = (msg, mult) => { bank += Math.round(bet * mult); K.setScore(bank); show(false); info.textContent = msg + ` (${bank} fichas)`; ctl.innerHTML = ''; A.sfx(mult > 0 ? 'win' : 'lose'); if (mult > 2) A.fx.confetti(140, true); if (bank < 10) return K.after(() => K.over('Faliu! 💸', bank), 1200); btn(ctl, 'Próxima mão', betPhase, 1); };
   const deal = b => { bet = b; bank -= b; d = deck(); ph = [d.pop(), d.pop()]; dh = [d.pop(), d.pop()]; A.sfx('click'); if (val(ph) == 21) return finish('Blackjack! 🎉', 2.5); turn(); };
@@ -63,43 +86,59 @@ A.register('blackjack', K => {
 
 // Guerra de Cartas: 26 rodadas, a carta maior leva; as vale 14.
 A.register('war', K => {
-  const d = deck(), msg = A.el('div', 'msg', 'Carta maior vence a rodada. Ás é a maior!', K.root), a = row(K.root, 'VOCÊ'), b = row(K.root, 'CPU'); let me = 0, cpu = 0, n = 0;
-  const bt = btn(K.root, '🃏 Virar cartas', () => {
+  const T = table(K, 'war');
+  const d = deck(), msg = A.el('div', 'msg', 'Carta maior vence a rodada. Ás é a maior!', T), a = row(T, 'VOCÊ'), b = row(T, 'CPU'); let me = 0, cpu = 0, n = 0;
+  const scoreEl = A.el('div', 'duel-score', '<span class="me">Você <b>0</b></span><span class="vs">×</span><span class="cpu"><b>0</b> CPU</span><span class="vs">·</span><span>Rodada <b>0</b>/26</span>', T);
+  const scoreVals = scoreEl.querySelectorAll('b');
+  const bt = btn(T, '🃏 Virar cartas', () => {
     const x = d.pop(), y = d.pop(), vx = x.v == 1 ? 14 : x.v, vy = y.v == 1 ? 14 : y.v; a.innerHTML = ''; b.innerHTML = ''; cardEl(x, a); cardEl(y, b); n++; A.sfx('click');
-    if (vx > vy) { me++; K.setScore(me); msg.textContent = 'Você ganhou a rodada!'; } else if (vy > vx) { cpu++; msg.textContent = 'CPU ganhou a rodada'; } else msg.textContent = 'Empate!';
-    if (!d.length) { bt.disabled = true; me > cpu ? K.over('Você venceu a guerra! ⚔️', me) : K.over(me == cpu ? 'Empate!' : 'CPU venceu', me, me <= cpu); } else msg.textContent += ` · Rodada ${n}/26 · ${me} × ${cpu}`;
+    if (vx > vy) { me++; K.setScore(me); msg.textContent = 'Você ganhou a rodada!'; A.sfx('coin'); } else if (vy > vx) { cpu++; msg.textContent = 'CPU ganhou a rodada'; } else msg.textContent = 'Empate!';
+    scoreVals[0].textContent = me; scoreVals[1].textContent = cpu; scoreVals[2].textContent = n;
+    if (!d.length) { bt.disabled = true; me > cpu ? K.over('Você venceu a guerra! ⚔️', me) : K.over(me == cpu ? 'Empate!' : 'CPU venceu', me, me <= cpu); } else msg.textContent += ` · Rodada ${n}/26`;
   }, 1);
 });
 
 // Maior ou Menor: aposte se a proxima carta sera maior ou menor que a atual.
 A.register('hilo', K => {
-  let d = deck(), cur = d.pop(); const msg = A.el('div', 'msg', 'A próxima carta é maior ou menor?', K.root), r = row(K.root, 'CARTA ATUAL'), ctl = A.el('div', 'btns', null, K.root);
+  const T = table(K, 'hilo');
+  let d = deck(), cur = d.pop(), streak = 0; const msg = A.el('div', 'msg', 'A próxima carta é maior ou menor?', T), r = row(T, 'CARTA ATUAL'), ctl = A.el('div', 'btns', null, T);
+  const streakEl = A.el('div', 'duel-score', '<span class="me">Acertos <b>0</b></span><span class="vs">·</span><span>Sequência <b>0</b></span>', T);
+  const streakVals = streakEl.querySelectorAll('b');
   const show = () => { r.innerHTML = ''; cardEl(cur, r); };
   const go = hi => {
     if (!d.length) d = deck(); const n = d.pop(), a = cur.v, b = n.v; cur = n; show();
     if (a == b) { msg.textContent = 'Igual! Sem pontos.'; return; }
-    if ((b > a) == hi) { K.addScore(10); msg.textContent = 'Acertou! 🔥'; A.sfx('coin'); } else K.over('Errou! Era ' + (b > a ? 'maior' : 'menor'));
+    if ((b > a) == hi) { streak++; K.addScore(10); streakVals[0].textContent = Math.floor(K.score / 10); streakVals[1].textContent = streak; msg.textContent = 'Acertou! 🔥'; A.sfx('coin'); }
+    else K.over('Errou! Era ' + (b > a ? 'maior' : 'menor'));
   };
-  btn(ctl, '⬆ Maior', () => go(true), 1); btn(ctl, '⬇ Menor', () => go(false)); show();
+  btn(ctl, '⬆ Maior', () => go(true), 1); btn(ctl, '⬇ Menor', () => go(false));
+  K.onKey(code => {
+    if (code === 'ArrowUp' || code === 'w' || code === 'W') go(true);
+    if (code === 'ArrowDown' || code === 's' || code === 'S') go(false);
+  });
+  show();
 });
 
 // Caca-Niquel: tres rolos animados, fichas ficticias e tabela de pagamentos.
 A.register('slots', K => {
+  const T = table(K, 'slots');
   const S = ['🍒', '🍋', '🔔', '⭐', '7️⃣'], PAY = { '🍒': 50, '🍋': 30, '🔔': 60, '⭐': 100, '7️⃣': 200 }; let bank = 100, spinning = false; K.setScore(bank);
-  const info = A.el('div', 'msg', 'Cada giro custa 10 fichas. Três iguais pagam muito!', K.root);
-  A.el('div', 'paytable', '🍒 50 · 🍋 30 · 🔔 60 · ⭐ 100 · 7️⃣ 200 · dois iguais 15', K.root);
-  const machine = A.el('div', 'slots', null, K.root);
-  const avail = Math.max(200, K.root.clientWidth - 40), rw = Math.max(50, Math.min(84, Math.floor((avail - 40) / 3))), rh = Math.round(rw * 1.24);
+  const info = A.el('div', 'msg', 'Cada giro custa 10 fichas. Três iguais pagam muito!', T);
+  const bankEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Fichas</small><b data-bank>100</b></span><span class="cb-item"><small>Giro</small><b>10</b></span>', T);
+  const bankVal = bankEl.querySelector('[data-bank]');
+  A.el('div', 'paytable', '🍒 50 · 🍋 30 · 🔔 60 · ⭐ 100 · 7️⃣ 200 · dois iguais 15', T);
+  const machine = A.el('div', 'slots', null, T);
+  const avail = Math.max(200, T.clientWidth - 40), rw = Math.max(50, Math.min(84, Math.floor((avail - 40) / 3))), rh = Math.round(rw * 1.24);
   const reels = [0, 1, 2].map(() => {
     const r = A.el('div', 'reel', null, machine); r.style.cssText = `width:${rw}px;height:${rh}px`;
     const st = A.el('div', 'reel-strip', null, r); st.innerHTML = `<div style="height:${rh}px;font-size:${rw * .64}px">${A.pick(S)}</div>`; return { r, st };
   });
-  const ctl = A.el('div', 'btns', null, K.root);
+  const ctl = A.el('div', 'btns', null, T);
   const sp = A.el('button', 'gb pri', '🎰 Girar (10)', ctl), leave = A.el('button', 'gb', 'Sair e salvar', ctl);
   const end = res => {
     spinning = false; machine.classList.remove('spinning'); let w = 0;
     if (res[0] == res[1] && res[1] == res[2]) w = PAY[res[0]]; else if (res[0] == res[1] || res[1] == res[2] || res[0] == res[2]) w = 15;
-    bank += w; K.setScore(bank);
+    bank += w; K.setScore(bank); bankVal.textContent = bank;
     info.innerHTML = w ? `🎉 <b style="color:#3ddc84">+${w} fichas!</b>` : 'Não foi dessa vez…';
     A.sfx(w ? 'win' : 'lose'); sp.disabled = false; leave.disabled = false;
     if (w) {
@@ -111,7 +150,7 @@ A.register('slots', K => {
     if (bank < 10) K.after(() => K.over('Faliu! 💸', bank), 1000);
   };
   sp.onclick = () => {
-    if (spinning || bank < 10) return; spinning = true; bank -= 10; K.setScore(bank); sp.disabled = true; leave.disabled = true; machine.classList.add('spinning');
+    if (spinning || bank < 10) return; spinning = true; bank -= 10; K.setScore(bank); bankVal.textContent = bank; sp.disabled = true; leave.disabled = true; machine.classList.add('spinning');
     const res = [A.pick(S), A.pick(S), A.pick(S)];
     const tick = K.every(() => A.sfx('step'), 80);
     reels.forEach((reel, i) => {
@@ -130,38 +169,91 @@ A.register('slots', K => {
 
 // Porquinho: role o dado 3D, acumule pontos e nao tire 1; primeiro a 50 vence.
 A.register('pig', K => {
-  let me = 0, cpu = 0, turn = 0, tp = 0, busy = false; const T = 50;
-  const info = A.el('div', 'msg', '', K.root);
-  const die = makeDie(96); die.el.style.margin = '6px auto'; K.root.appendChild(die.el);
-  const ctl = A.el('div', 'btns', null, K.root);
-  const upd = () => info.textContent = `Você ${me} × ${cpu} CPU · Rodada: ${tp} · Primeiro a ${T} vence`;
+  const T = table(K, 'pig');
+  let me = 0, cpu = 0, turn = 0, tp = 0, busy = false; const TARGET = 50;
+  const info = A.el('div', 'msg', '', T);
+  const scoreEl = A.el('div', 'casino-bank', '<span class="cb-item"><small>Você</small><b data-me>0</b></span><span class="cb-item"><small>CPU</small><b data-cpu>0</b></span><span class="cb-item"><small>Rodada</small><b data-tp>0</b></span>', T);
+  const meVal = scoreEl.querySelector('[data-me]'), cpuVal = scoreEl.querySelector('[data-cpu]'), tpVal = scoreEl.querySelector('[data-tp]');
+  const tray = A.el('div', 'dice-tray', null, T);
+  const die = makeDie(96); die.el.style.margin = '6px auto'; tray.appendChild(die.el);
+  const ctl = A.el('div', 'btns', null, T);
+  const upd = () => {
+    info.textContent = `Primeiro a ${TARGET} vence · Rodada vale ${tp} ponto${tp === 1 ? '' : 's'}`;
+    meVal.textContent = me; cpuVal.textContent = cpu; tpVal.textContent = tp;
+  };
   const end = who => { if (who) { A.sfx('lose'); K.over('A CPU venceu 🤖'); } else { K.addScore(1); A.sfx('win'); K.over('Você venceu! 🐷'); } };
   const roll = who => { const r = A.rand(1, 6); die.set(r, true); A.sfx('click'); if (r == 1) { tp = 0; return false; } tp += r; return true; };
-  const hold = () => { if (turn == 0) me += tp; else cpu += tp; tp = 0; if (me >= T) return end(0); if (cpu >= T) return end(1); turn = 1 - turn; upd(); if (turn) cpuTurn(); };
-  const cpuTurn = () => { busy = true; K.after(function step() { if (!roll(1)) { turn = 0; busy = false; upd(); return; } upd(); if (tp >= 18 || cpu + tp >= T) { K.after(() => { busy = false; hold(); }, 500); } else K.after(step, 600); }, 700); };
+  const hold = () => { if (turn == 0) me += tp; else cpu += tp; tp = 0; if (me >= TARGET) return end(0); if (cpu >= TARGET) return end(1); turn = 1 - turn; upd(); if (turn) cpuTurn(); };
+  const cpuTurn = () => { busy = true; K.after(function step() { if (!roll(1)) { turn = 0; busy = false; upd(); return; } upd(); if (tp >= 18 || cpu + tp >= TARGET) { K.after(() => { busy = false; hold(); }, 500); } else K.after(step, 600); }, 700); };
   btn(ctl, '🎲 Rolar', () => { if (busy || turn) return; if (!roll(0)) { turn = 1; upd(); cpuTurn(); } else upd(); }, 1); btn(ctl, '✋ Guardar', () => { if (!busy && !turn && tp) hold(); }); upd();
 });
 
-// Cara ou Coroa: moeda 3D animada e sequencia de acertos.
+// Cara ou Coroa: moeda 3D animada, sequencia, historico e mesa tematica.
 A.register('coinflip', K => {
-  const msg = A.el('div', 'msg', 'Cara ou coroa? Acerte em sequência!', K.root);
-  const c = A.el('div', 'coin3d', null, K.root);
-  A.el('div', 'coin-face', '👑', c); A.el('div', 'coin-face back', '🔱', c);
-  const ctl = A.el('div', 'btns', null, K.root); let rot = 0, busy = false;
-  [['👑 Cara', 0], ['🔱 Coroa', 1]].forEach(([t, v]) => btn(ctl, t, () => {
-    if (busy) return; busy = true; const r = A.rand(0, 1);
-    rot = rot - (rot % 360) + 720 + (r ? 180 : 0);
-    c.style.transform = `rotateY(${rot}deg)`; A.sfx('step');
+  const T = table(K, 'coinflip');
+  const panel = A.el('div', 'coin-panel', null, T);
+  const msg = A.el('div', 'msg', 'Cara ou coroa? Acerte em sequência!', panel);
+  const stats = A.el('div', 'coin-stats', null, panel);
+  const streakEl = A.el('span', 'coin-stat', '<small>Sequência</small><b>0</b>', stats);
+  const bestEl = A.el('span', 'coin-stat', '<small>Recorde</small><b>0</b>', stats);
+  const triesEl = A.el('span', 'coin-stat', '<small>Giros</small><b>0</b>', stats);
+  const stageEl = A.el('div', 'coin-stage', null, panel);
+  const c = A.el('div', 'coin3d', null, stageEl);
+  A.el('div', 'coin-face front', '<span class="coin-emoji">👑</span><img class="coin-logo" src="images/gpweb.png" alt=""><b>CARA</b>', c);
+  A.el('div', 'coin-face back', '<span class="coin-emoji">🔱</span><img class="coin-logo" src="images/gpweb.png" alt=""><b>COROA</b>', c);
+  const historyEl = A.el('div', 'coin-history', null, panel);
+  const ctl = A.el('div', 'btns coin-actions', null, T);
+  let rot = 0, busy = false, best = 0, tries = 0, history = [];
+  const paint = () => {
+    streakEl.querySelector('b').textContent = K.score;
+    bestEl.querySelector('b').textContent = best;
+    triesEl.querySelector('b').textContent = tries;
+    historyEl.innerHTML = history.length
+      ? history.map((item, i) => '<span class="coin-chip ' + (item.win ? 'win' : 'lose') + '">' + item.label + '</span>').join('')
+      : '<span class="coin-empty">Os últimos giros aparecem aqui.</span>';
+  };
+  const flip = pick => {
+    if (busy) return;
+    busy = true;
+    const r = A.rand(0, 1);
+    const label = r ? '🔱 Coroa' : '👑 Cara';
+    tries++;
+    rot = rot - (rot % 360) + 1080 + (r ? 180 : 0);
+    c.classList.remove('landed');
+    c.classList.add('tossing');
+    c.style.transform = `rotateY(${rot}deg)`;
+    A.sfx('step');
     K.after(() => {
+      c.classList.remove('tossing');
+      c.classList.add('landed');
       busy = false;
-      if (r == v) { K.addScore(1); msg.textContent = 'Acertou! 🍀'; A.sfx('coin'); if (K.score % 5 === 0) A.fx.confetti(80, true); }
-      else K.over('Deu ' + (r ? 'coroa' : 'cara'));
-    }, 720);
-  }, 1));
+      const win = r === pick;
+      history = [{ label, win }].concat(history).slice(0, 8);
+      if (win) {
+        K.addScore(1);
+        best = Math.max(best, K.score);
+        msg.textContent = K.score > 1 ? 'Acertou de novo! 🔥 Sequência de ' + K.score : 'Acertou! 🍀';
+        A.sfx('coin');
+        if (K.score % 5 === 0) A.fx.confetti(110, true);
+      } else {
+        msg.textContent = 'Deu ' + (r ? 'coroa' : 'cara') + '. Fim da sequência!';
+        A.sfx('lose');
+      }
+      paint();
+      if (!win) K.after(() => K.over('Você acertou ' + K.score + ' seguida' + (K.score === 1 ? '' : 's') + '. Deu ' + (r ? 'coroa' : 'cara') + '.', K.score), 900);
+    }, 760);
+  };
+  [['👑 Cara', 0], ['🔱 Coroa', 1]].forEach(([t, v]) => btn(ctl, t, () => flip(v), 1));
+  K.onKey(code => {
+    if (code === 'ArrowLeft' || code === 'a' || code === 'A') flip(0);
+    if (code === 'ArrowRight' || code === 'd' || code === 'D') flip(1);
+  });
+  paint();
 });
 
 // Roleta europeia: 37 numeros, apostas em cor/par/faixa/numero e roda animada.
 A.register('roulette', K => {
+  const T = table(K, 'roulette');
   const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
   const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
   const STEP = Math.PI * 2 / 37, TAU = Math.PI * 2, C = 200, RW = 185;
@@ -169,7 +261,7 @@ A.register('roulette', K => {
   let bank = 500, bets = {}, chip = 25, spinning = false, angle = -Math.PI / 2, anim = null, hist = [];
   K.setScore(bank);
 
-  const wrap = A.el('div', 'rl', null, K.root);
+  const wrap = A.el('div', 'rl', null, T);
   const wheelBox = A.el('div', 'rl-wheel', null, wrap);
   const cv = A.el('canvas', null, null, wheelBox); cv.width = 400; cv.height = 400;
   const g = cv.getContext('2d');
@@ -183,7 +275,7 @@ A.register('roulette', K => {
   const spinBtn = A.el('button', 'gb pri', '🎡 GIRAR', ctl);
   const clearBtn = A.el('button', 'gb', 'Limpar', ctl);
   const leaveBtn = A.el('button', 'gb', 'Sair', ctl);
-  const board = A.el('div', 'rl-board', null, K.root);
+  const board = A.el('div', 'rl-board', null, T);
 
   const spots = {};
   const chipBtns = [5, 10, 25, 50].map(v => {
@@ -307,57 +399,73 @@ A.register('roulette', K => {
 
 // Dados Poker: cinco dados 3D, tres rolagens e oito categorias de pontuacao.
 A.register('dados', K => {
-  const CAT = [['Par', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 2) return v * 2; return 0; }], ['Dois pares', d => { const p = [1, 2, 3, 4, 5, 6].filter(v => d.filter(x => x == v).length >= 2); return p.length >= 2 ? p.reduce((s, v) => s + v * 2, 0) : 0; }], ['Trinca', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 3) return v * 3; return 0; }], ['Sequência (30)', d => { const s = [...new Set(d)].sort().join(''); return /12345|23456/.test(s) ? 30 : 0; }], ['Full house (25)', d => { const c = [1, 2, 3, 4, 5, 6].map(v => d.filter(x => x == v).length); return c.includes(3) && c.includes(2) ? 25 : 0; }], ['Quadra (40)', d => [1, 2, 3, 4, 5, 6].some(v => d.filter(x => x == v).length >= 4) ? 40 : 0], ['Yahtzee (50)', d => d.every(x => x == d[0]) ? 50 : 0], ['Soma', d => d.reduce((a, b) => a + b)]];
+  const T = table(K, 'dados');
+  const CAT = [['Par', '👯', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 2) return v * 2; return 0; }], ['Dois pares', '👬', d => { const p = [1, 2, 3, 4, 5, 6].filter(v => d.filter(x => x == v).length >= 2); return p.length >= 2 ? p.reduce((s, v) => s + v * 2, 0) : 0; }], ['Trinca', '🎯', d => { for (let v = 6; v >= 1; v--) if (d.filter(x => x == v).length >= 3) return v * 3; return 0; }], ['Sequência (30)', '🪜', d => { const s = [...new Set(d)].sort().join(''); return /12345|23456/.test(s) ? 30 : 0; }], ['Full house (25)', '🏠', d => { const c = [1, 2, 3, 4, 5, 6].map(v => d.filter(x => x == v).length); return c.includes(3) && c.includes(2) ? 25 : 0; }], ['Quadra (40)', '💥', d => [1, 2, 3, 4, 5, 6].some(v => d.filter(x => x == v).length >= 4) ? 40 : 0], ['Yahtzee (50)', '🏆', d => d.every(x => x == d[0]) ? 50 : 0], ['Soma', '➕', d => d.reduce((a, b) => a + b)]];
   let d = Array.from({ length: 5 }, () => A.rand(1, 6)), hold = [0, 0, 0, 0, 0], rolls = 0, used = {}, turns = 0, busy = false;
-  const info = A.el('div', 'msg', 'Role até 3 vezes, toque nos dados para segurar e escolha uma categoria.', K.root);
-  const stats = A.el('div', '', null, K.root); stats.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;justify-content:center';
-  const statBox = label => {
-    const w = A.el('div', '', '', stats); w.style.textAlign = 'center';
-    const small = A.el('small', '', label, w); small.style.cssText = 'display:block;font-size:10px;letter-spacing:.12em;color:#9aa0c8;text-transform:uppercase';
-    const b = A.el('b', '', '0', w); b.style.cssText = 'font-size:18px;font-variant-numeric:tabular-nums';
-    return b;
+  const info = A.el('div', 'msg', 'Role até 3 vezes, toque nos dados para segurar e escolha uma categoria.', T);
+  const stats = A.el('div', 'dice-stats', null, T);
+  const statBox = (label, icon) => {
+    const w = A.el('div', 'dice-stat', `<small>${icon} ${label}</small><b>0</b>`, stats);
+    return w.querySelector('b');
   };
-  const totalEl = statBox('Pontos'), roundEl = statBox('Rodada'), rollEl = statBox('Rolagens');
+  const totalEl = statBox('Pontos', '⭐'), roundEl = statBox('Rodada', '🎯'), rollEl = statBox('Rolagens', '🎲');
 
-  const diceRow = A.el('div', 'dice-row', null, K.root);
-  const avail = Math.max(200, K.root.clientWidth - 40), ds = Math.max(42, Math.min(66, Math.floor((avail - 40) / 5)));
+  const tray = A.el('div', 'dice-tray', null, T);
+  const dots = A.el('div', 'dice-dots', null, tray);
+  const diceRow = A.el('div', 'dice-row', null, tray);
+  const avail = Math.max(200, T.clientWidth - 40), ds = Math.max(42, Math.min(66, Math.floor((avail - 40) / 5)));
   const dice = d.map((v, i) => {
     const die = makeDie(ds); diceRow.appendChild(die.el); die.set(v, false);
-    die.el.onclick = () => { if (!rolls || busy) return; hold[i] ^= 1; die.el.classList.toggle('held', !!hold[i]); A.sfx('click'); };
+    die.el.onclick = () => { if (!rolls || busy) return; hold[i] ^= 1; A.sfx('click'); draw(); };
     return die;
   });
-  const rb = A.el('button', 'gb pri', '🎲 Rolar', K.root);
-  const cat = A.el('div', '', null, K.root); cat.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));gap:8px;width:100%;max-width:460px';
-  const cs = CAT.map((c, i) => { const b = A.el('button', 'gb', '', cat); b.onclick = () => pick(i); return b; });
+  const heldHint = A.el('div', 'dice-hint', 'Toque num dado para segurá-lo entre as rolagens.', tray);
+  const rb = A.el('button', 'gb pri', '🎲 Rolar', T);
+  const cat = A.el('div', 'dice-cats', null, T);
+  const cs = CAT.map((c, i) => { const b = A.el('button', 'score-cat', '', cat); b.onclick = () => pick(i); return b; });
   const draw = () => {
-    dice.forEach((die, i) => die.el.classList.toggle('held', !!hold[i]));
+    dice.forEach((die, i) => {
+      die.el.classList.toggle('held', !!hold[i]);
+      die.el.dataset.held = hold[i] ? 'SEGURO' : '';
+    });
+    dots.innerHTML = [0, 1, 2].map(n => '<i class="' + (n < rolls ? 'used' : '') + '"></i>').join('');
     rb.textContent = rolls >= 3 ? '🎲 Sem rolagens' : `🎲 Rolar (${3 - rolls})`;
     rb.disabled = rolls >= 3 || busy;
     cs.forEach((b, i) => {
-      const sc = used[i], active = rolls > 0 && sc == null && !busy, pts = CAT[i][1](d);
+      const sc = used[i], active = rolls > 0 && sc == null && !busy, pts = CAT[i][2](d);
       b.disabled = !active; b.classList.toggle('pri', active && pts > 0);
-      b.innerHTML = `<b>${CAT[i][0]}</b>` + (sc != null ? `<br><small style="color:#3ddc84">+${sc}</small>` : rolls ? `<br><small style="color:${pts ? '#3ddc84' : '#9aa0c8'}">${pts} pts</small>` : '');
+      b.classList.toggle('done', sc != null);
+      b.innerHTML = '<span class="sc-ico">' + CAT[i][1] + '</span>' +
+        '<span class="sc-copy"><b>' + CAT[i][0] + '</b>' +
+        (sc != null ? '<small class="sc-done">+' + sc + ' pts</small>' : rolls ? '<small class="' + (pts ? 'sc-pts' : 'sc-zero') + '">' + pts + ' pts</small>' : '<small class="sc-zero">—</small>') +
+        '</span>';
     });
     totalEl.textContent = K.score; roundEl.textContent = Math.min(turns + 1, CAT.length) + '/' + CAT.length; rollEl.textContent = rolls + '/3';
   };
   const roll = () => {
     if (rolls >= 3 || busy || K.dead) return;
-    busy = true; A.sfx('click');
+    busy = true; A.sfx('click'); diceRow.classList.add('rolling');
     const next = d.map((v, i) => hold[i] ? v : A.rand(1, 6));
     dice.forEach((die, i) => { if (!hold[i]) die.set(next[i], true); });
     d = next; rolls++; draw();
-    K.after(() => { busy = false; draw(); }, 760);
+    K.after(() => { busy = false; diceRow.classList.remove('rolling'); draw(); }, 760);
   };
   const pick = i => {
     if (rolls <= 0 || used[i] != null || busy) return;
-    const pts = CAT[i][1](d); used[i] = pts; K.addScore(pts); A.sfx(pts ? 'coin' : 'hit');
+    const pts = CAT[i][2](d); used[i] = pts; K.addScore(pts); A.sfx(pts ? 'coin' : 'hit');
     if (pts >= 30) A.fx.confetti(110, true);
     rolls = 0; hold = [0, 0, 0, 0, 0]; turns++;
     draw();
-    if (turns === CAT.length) K.after(() => K.over('Fim das rodadas! 🎲'), 600);
+    if (turns === CAT.length) K.after(() => K.over('Fim das rodadas! 🎲', K.score), 600);
     else info.textContent = pts ? `+${pts} pontos! Role novamente.` : 'Zero pontos… tente outra categoria.';
   };
-  rb.onclick = roll; draw();
+  rb.onclick = roll;
+  K.onKey(code => {
+    if (code === 'r' || code === 'R' || code === 'Space') roll();
+    const n = Number(code);
+    if (n >= 1 && n <= CAT.length) pick(n - 1);
+  });
+  draw();
 });
 
 A.register('solitaire', K => {
@@ -395,7 +503,7 @@ A.register('solitaire', K => {
   const DECKS = A.cardDecks || [{
     id: 'classic', name: 'Clássico', cost: 0,
     face: 'linear-gradient(155deg,#fff,#e8ebf6)',
-    back: 'repeating-linear-gradient(45deg,#4c3bd0,#4c3bd0 6px,#6b57ff 6px,#6b57ff 12px)',
+    back: A.cardBack || 'url(../images/gpweb.png) center 44%/66% no-repeat, radial-gradient(circle at 50% 28%,#24356f,#070a1a 74%)',
     ink: '#14172a', red: '#d21f3c'
   }];
   const deckId = A.store.get('sol:deck', 'classic');
@@ -420,10 +528,15 @@ A.register('solitaire', K => {
   const top = A.el('div', 'sol-top', null, sol);
   const tableau = A.el('div', 'sol-tableau', null, sol);
   const ctl = A.el('div', 'btns sol-ctl', null, sol);
-  const hintBtn = A.el('button', 'gb', '💡 Dica', ctl);
-  const undoBtn = A.el('button', 'gb', '↶ Voltar jogada', ctl);
-  const restartBtn = A.el('button', 'gb', '↻ Reiniciar', ctl);
-  const helpBtn = A.el('button', 'gb', '? Como jogar', ctl);
+  const hintBtn = A.el('button', 'gb sol-ico', '💡', ctl);
+  const undoBtn = A.el('button', 'gb sol-ico', '↶', ctl);
+  const restartBtn = A.el('button', 'gb sol-ico', '↻', ctl);
+  const helpBtn = A.el('button', 'gb sol-ico', '?', ctl);
+  [['Dica', hintBtn], ['Voltar jogada', undoBtn], ['Reiniciar', restartBtn], ['Como jogar', helpBtn]]
+    .forEach(([label, button]) => {
+      button.title = label;
+      button.setAttribute('aria-label', label);
+    });
 
   const help = A.el('div', 'sol-help', `
     <button class="sol-help-x" type="button" aria-label="Fechar dicas">✕</button>
@@ -432,7 +545,7 @@ A.register('solitaire', K => {
       <li>Arraste uma carta para o destino <b>ou</b> toque nela e depois no destino.</li>
       <li>Monte sequências com cores alternadas e em ordem decrescente. Só um Rei pode ocupar uma coluna vazia.</li>
       <li>Clique no monte fechado para comprar cartas. Quando ele esvaziar, clique no espaço ↻ para reembaralhar.</li>
-      <li><b>Voltar jogada</b> desfaz o último movimento. <b>Dica</b> destaca uma jogada possível.</li>
+      <li><b>↶</b> desfaz o último movimento. <b>💡</b> destaca uma jogada possível. <b>↻</b> reinicia a fase.</li>
     </ul>`, sol);
   help.hidden = true;
 
@@ -467,7 +580,7 @@ A.register('solitaire', K => {
   const upd = () => {
     const L = CAMPAIGN[level];
     const passText = L.passes == null ? 'reembaralhe ∞' : 'reembaralhe ' + L.passes;
-    info.innerHTML = `<b>Fase ${level + 1}/40</b> · ${TIER[L.tier]} · compre ${L.draw} · ${passText} · <b>${moves}</b> mov. · 🪙 <b class="sol-coin">${A.wallet.get()}</b>`;
+    info.innerHTML = `<b>Fase ${level + 1}/40</b> · ${TIER[L.tier]} · compre ${L.draw} · ${passText} · <b>${moves}</b> mov. · 🪙 <b class="sol-coin">${A.economy ? A.economy.balance('solitaire') : 0}</b>`;
     K.setScore(baseMoves + moves);
   };
   const canRun = (col, index) => {
@@ -619,7 +732,7 @@ A.register('solitaire', K => {
     const reward = 14 + (level + 2) * 2;
     baseMoves += moves; moves = 0;
     if (K.story) A.story.set('solitaire', Math.min(40, level + 2), level === CAMPAIGN.length - 1);
-    A.wallet.add(reward);
+    if (A.economy) A.economy.earn('solitaire', reward);
     sol.classList.add('won');
     render();
     A.fx.confetti(190, true); A.sfx('win');

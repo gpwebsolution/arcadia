@@ -63,6 +63,7 @@
       mode: options.mode || 'quick',
       story: !!options.story,
       phaseGate: options.phaseGate || null,
+      onRevive: options.onRevive || null,
       fx: A.fx,
       sfx: A.sfx
     };
@@ -100,8 +101,9 @@
     };
 
     K.addScore = value => {
-      K.setScore(K.score + value);
-      if (value) options.popScore && options.popScore(value);
+      const gained = Number(value) || 0;
+      K.setScore(K.score + gained);
+      if (gained) options.popScore && options.popScore(gained);
     };
 
     /* Atalhos de efeitos visuais. */
@@ -170,10 +172,14 @@
       if (K.dead) return;
       if (score != null) K.setScore(score);
 
+
       K.dead = true;
       K.stop();
 
       const newBest = nosave ? false : K.submit(K.score);
+      if (!nosave && A.economy) {
+        A.economy.award(options.id, { score: K.score, newBest, mode: options.mode });
+      }
       A.gameHistory.push(options.id, {
         score: K.score,
         text: K.fmt(K.score),
@@ -491,6 +497,31 @@
   const overlay = $('ov');
   const stage = $('stage');
   const padHost = $('padhost');
+
+  /* Cenário de mesa com a marca GPWeb (PNG transparente) e as cores do tema
+     escolhido na loja do próprio jogo. */
+  function applyScene() {
+    stage.dataset.game = gameId;
+    stage.dataset.cat = meta.cat;
+    const root = document.documentElement;
+    if (!root.style.getPropertyValue('--scene-a')) {
+      const h = A.hue(gameId);
+      root.style.setProperty('--scene-a', 'hsl(' + h + ' 70% 26%)');
+      root.style.setProperty('--scene-b', '#070a1a');
+      root.style.setProperty('--scene-accent', 'hsl(' + h + ' 90% 62%)');
+    }
+    if (A.economy) A.economy.applyTheme(gameId);
+    if (!stage.querySelector('.stage-scene')) {
+      const scene = document.createElement('div');
+      scene.className = 'stage-scene';
+      scene.dataset.cat = meta.cat;
+      scene.innerHTML = '<img src="images/gpweb.png" alt="" aria-hidden="true">';
+      stage.appendChild(scene);
+    }
+  }
+
+  if (A.economy) A.economy.mount(gameId);
+
   let kit = null;
   let pausedByUser = false;
   let pauseBadge = null;
@@ -720,7 +751,7 @@
     const decks = A.cardDecks || [];
     if (!decks.length) return null;
 
-    const unlocked = new Set(A.store.get('sol:decks', ['classic']));
+    let unlocked = new Set(A.store.get('sol:decks', ['classic']));
     unlocked.add('classic');
     let selected = A.store.get('sol:deck', 'classic');
     if (!unlocked.has(selected)) {
@@ -733,7 +764,7 @@
 
     const inner = () => `
       <div class="hub-sol-top">
-        <span class="sol-wallet">🪙 <b data-coins>${A.wallet.get()}</b> moedas</span>
+        <span class="sol-wallet">🪙 <b data-coins>${A.economy ? A.economy.balance('solitaire') : 0}</b> moedas do jogo</span>
         <small>Ganhe moedas ao concluir fases e troque por baralhos.</small>
       </div>
       <div class="hub-label" style="margin:12px 0 6px">Seu baralho</div>
@@ -769,6 +800,7 @@
       if (unlocked.has(deckId)) {
         selected = deckId;
         A.store.set('sol:deck', deckId);
+        A.economy?.selectTheme('solitaire', deckId);
         A.sfx('click');
         paint();
         return;
@@ -790,7 +822,11 @@
         return;
       }
 
-      if (!A.wallet.spend(deck.cost)) {
+      const bought = A.economy
+        ? A.economy.buyTheme('solitaire', deckId)
+        : { ok: false, msg: 'Loja indisponível.' };
+
+      if (!bought.ok) {
         asking = null;
         A.sfx('hit');
         A.fx.shake(button);
@@ -800,6 +836,8 @@
         return;
       }
 
+      unlocked = new Set(A.store.get('sol:decks', ['classic']));
+      unlocked.add('classic');
       unlocked.add(deckId);
       A.store.set('sol:decks', Array.from(unlocked));
       A.store.set('sol:deck', deckId);
@@ -831,11 +869,21 @@
     const storySub = storyDone ? 'Campanha concluída · todas as 40 fases' : 'Fase ' + storyLevel + ' de 40 · progresso salvo';
     const category = A.cats[meta.cat] || { name: '', icon: '' };
     const homeExtras = gameId === 'solitaire' ? solitaireHome() : null;
+    const econ = A.economy && A.economy.isEnabled(gameId) ? A.economy.currency(gameId) : null;
+    const walletHTML = econ ? `
+      <div class="hub-wallet" style="--econ-accent:${econ.accent}">
+        <span class="hub-wallet-ico">${econ.icon}</span>
+        <span class="hub-wallet-copy"><small>${econ.name}</small><b>${A.economy.balance(gameId)}</b></span>
+        <span class="hub-wallet-actions">
+          <button type="button" class="hub-wallet-btn" data-hub="econ">🛒 Loja</button>
+          <button type="button" class="hub-wallet-btn ghost" data-hub="econ-quests">🏆 Desafios</button>
+        </span>
+      </div>` : '';
 
     const modes = [];
 
     if (storyGame) {
-      modes.push(`<button class="mode-card pri m-story" data-mode="story" type="button">
+      modes.push(`<button class="mode-card pri m-story" data-mode="${storyDone ? 'story-reset' : 'story'}" type="button">
         <i>📖</i><span><b>${storyTitle}</b><small>${storySub}</small></span><em>›</em>
       </button>`);
       modes.push(`<button class="mode-card m-quick" data-mode="quick" type="button">
@@ -869,6 +917,7 @@
           <a class="hub-home" href="index.html" aria-label="Voltar para todos os jogos">✕</a>
         </div>
         <p>${meta.desc}</p>
+        ${walletHTML}
         ${homeExtras ? homeExtras.html : ''}
         ${storyGame ? `
           <div class="hub-story">
@@ -880,6 +929,7 @@
         <div class="hub-modes">${modes.join('')}</div>
         <div class="hub-label">Extras</div>
         <div class="hub-tools">
+          ${A.economy && A.economy.isEnabled(gameId) ? '<button type="button" class="hub-tool" data-hub="econ"><i>🪙</i><span><b>Loja do jogo</b><small>Moedas e temas exclusivos</small></span></button>' : ''}
           <button type="button" class="hub-tool" data-hub="ranking"><i>🏅</i><span><b>Ranking</b><small>Melhores resultados</small></span></button>
           <button type="button" class="hub-tool" data-hub="history"><i>🕘</i><span><b>Histórico</b><small>Partidas anteriores</small></span></button>
           <button type="button" class="hub-tool" data-hub="settings" id="ovcfg"><i>⚙</i><span><b>Ajustes</b><small>Som, volume, modos e progresso</small></span></button>
@@ -913,6 +963,8 @@
     overlay.querySelectorAll('[data-hub]').forEach(button => {
       button.onclick = () => {
         if (button.dataset.hub === 'settings') openSettings();
+        else if (button.dataset.hub === 'econ') A.economy?.open(gameId, 'shop');
+        else if (button.dataset.hub === 'econ-quests') A.economy?.open(gameId, 'quests');
         else showInfoPanel(button.dataset.hub);
       };
     });
@@ -1008,12 +1060,26 @@
   function showOver(message, score, newBest, best) {
     overlay.hidden = false;
     const story = lastStart.mode === 'story';
+    const econ = A.economy && A.economy.isEnabled(gameId) ? A.economy.currency(gameId) : null;
+    const gain = econ ? A.economy.lastGain(gameId) : 0;
+    const balance = econ ? A.economy.balance(gameId) : 0;
+    const econHTML = econ ? `
+      <div class="ov-econ" style="--econ-accent:${econ.accent}">
+        <span class="ov-econ-ico">${econ.icon}</span>
+        <span class="ov-econ-copy"><small>${econ.name}</small><b>${balance}</b></span>
+        ${gain ? `<em>+${gain}</em>` : ''}
+        <span class="ov-econ-actions">
+          <button class="btn ghost" id="overShop" type="button">🛒 Loja</button>
+          <button class="btn ghost" id="overQuests" type="button">🏆 Desafios</button>
+        </span>
+      </div>` : '';
     overlay.innerHTML = `
       <div class="box">
         ${newBest ? '<span class="badge">NOVO RECORDE!</span>' : ''}
         <h2>${message}</h2>
         <div class="sc">${score}</div>
         <p>Recorde: ${best == null ? '–' : best}</p>
+        ${econHTML}
         <div class="ov-actions">
           <button class="btn" id="again" type="button">↻ ${story ? 'Repetir fase' : 'Jogar de novo'}</button>
           <button class="btn ghost" id="overMenu" type="button">☰ Menu do jogo</button>
@@ -1022,6 +1088,10 @@
       </div>`;
     $('again').onclick = () => start();
     $('overMenu').onclick = returnToHub;
+    const overShop = $('overShop');
+    if (overShop) overShop.onclick = () => A.economy?.open(gameId, 'shop');
+    const overQuests = $('overQuests');
+    if (overQuests) overQuests.onclick = () => A.economy?.open(gameId, 'quests');
 
     if (newBest) setTimeout(() => A.fx.confetti(190, true), 140);
     else A.fx.shake($('frame'));
@@ -1053,6 +1123,7 @@
   function start(options) {
     if (options && options.mode) lastStart = { mode: options.mode };
 
+    const isRevive = !!(options && options.revive);
     const session = Object.assign({ mode: 'quick' }, lastStart);
     if (session.mode === 'story' && !storyGame) session.mode = 'quick';
     if (session.mode === 'story' && options && options.resetStory) A.story.reset(gameId);
@@ -1072,20 +1143,34 @@
       pausedByUser = false;
       pauseBadge = null;
       $('pause').textContent = '⏸';
+      applyScene();
 
       /* Ativa o contexto de som/configuração deste jogo. */
       A.activeGame = gameId;
       A.applyActiveConfig();
       A.activeConfig = config;
 
+      /* Superfície de jogo para categorias de tabuleiro leve (puzzle, palavras,
+         reflexos e esportes). Cartas e tabuleiro já têm a própria mesa; arcade
+         usa o palco inteiro para o canvas. */
+      let surface = stage;
+      if (!['cartas', 'tabuleiro', 'arcade'].includes(meta.cat)) {
+        surface = document.createElement('div');
+        surface.className = 'game-surface';
+        surface.dataset.cat = meta.cat;
+        surface.dataset.game = gameId;
+        stage.appendChild(surface);
+      }
+
       kit = A.createKit({
         id: gameId,
-        stage,
+        stage: surface,
         padHost,
         config,
         story: session.mode === 'story',
         mode: session.mode,
         phaseGate: showPhaseGate,
+        onRevive: () => start({ revive: true }),
         setScore: hud.setScore,
         setBest: hud.setBest,
         popScore: hud.popScore,
@@ -1096,6 +1181,7 @@
       kit.setScore(0);
       A.pushRecent(gameId);
       A.ui?.refresh?.();
+      if (!isRevive && A.economy) A.economy.begin(gameId);
       A.sfx('click');
 
       try {
@@ -1258,14 +1344,20 @@
 
     if (paused) {
       if (!pauseBadge) {
+        const pauseEcon = A.economy && A.economy.isEnabled(gameId) ? A.economy.currency(gameId) : null;
+        const pauseWallet = pauseEcon
+          ? `<span class="pause-wallet" style="--econ-accent:${pauseEcon.accent}"><i>${pauseEcon.icon}</i><b>${A.economy.balance(gameId)}</b><small>${pauseEcon.name}</small></span>`
+          : '';
         pauseBadge = A.el('div', 'pause-badge',
-          '<b>PAUSADO</b><small>Pressione P ou ▶ para continuar</small>' +
+          '<b>PAUSADO</b>' + pauseWallet +
           '<div class="pause-actions">' +
-          '<button class="btn" id="pauseResume" type="button">▶ Continuar</button>' +
-          '<button class="btn ghost" id="pauseSettings" type="button">⚙ Ajustes</button>' +
-          '<button class="btn ghost" id="pauseRestart" type="button">↻ Reiniciar</button>' +
-          '<button class="btn ghost" id="pauseMenu" type="button">☰ Menu do jogo</button>' +
-          '<button class="btn ghost" id="pauseHome" type="button">🏠 Início</button>' +
+          '<button class="btn" id="pauseResume" type="button" title="Continuar" aria-label="Continuar">▶</button>' +
+          '<button class="btn ghost" id="pauseSettings" type="button" title="Ajustes" aria-label="Ajustes">⚙</button>' +
+          (A.economy && A.economy.isEnabled(gameId) ? '<button class="btn ghost" id="pauseShop" type="button" title="Loja do jogo" aria-label="Loja do jogo">🪙</button>' : '') +
+          (A.economy && A.economy.isEnabled(gameId) ? '<button class="btn ghost" id="pauseQuests" type="button" title="Desafios do jogo" aria-label="Desafios do jogo">🏆</button>' : '') +
+          '<button class="btn ghost" id="pauseRestart" type="button" title="Reiniciar" aria-label="Reiniciar">↻</button>' +
+          '<button class="btn ghost" id="pauseMenu" type="button" title="Menu do jogo" aria-label="Menu do jogo">☰</button>' +
+          '<button class="btn ghost" id="pauseHome" type="button" title="Início" aria-label="Início">🏠</button>' +
           '</div>', stage);
         pauseBadge.querySelector('#pauseResume').onclick = event => {
           event.stopPropagation();
@@ -1274,6 +1366,16 @@
         pauseBadge.querySelector('#pauseSettings').onclick = event => {
           event.stopPropagation();
           openSettings();
+        };
+        const pauseShop = pauseBadge.querySelector('#pauseShop');
+        if (pauseShop) pauseShop.onclick = event => {
+          event.stopPropagation();
+          A.economy?.open(gameId, 'shop');
+        };
+        const pauseQuests = pauseBadge.querySelector('#pauseQuests');
+        if (pauseQuests) pauseQuests.onclick = event => {
+          event.stopPropagation();
+          A.economy?.open(gameId, 'quests');
         };
         pauseBadge.querySelector('#pauseRestart').onclick = event => {
           event.stopPropagation();
@@ -1407,6 +1509,12 @@
     characterData: true,
     attributes: true,
     attributeFilter: ['style']
+  });
+
+  /* A bolsa avisa quando uma fase foi liberada por item (Pular Fase). */
+  document.addEventListener('arcadia:refresh-hub', () => {
+    if (gameRunning()) returnToHub();
+    else showStart();
   });
 
   /* Abre a tela inicial. O jogo só começa quando o jogador clica em JOGAR. */

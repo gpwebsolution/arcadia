@@ -127,7 +127,7 @@ A.register('numbermem', K => {
 
 // Tabela Relampago: clique de 1 a 25 em ordem; o tempo e o criterio de vitoria.
 A.register('schulte', K => {
-  K.low = true; K.fmt = n => (n / 10).toFixed(1) + 's'; const sz = fit(5, 64, 70); let nx = 1, t = 0, on = false;
+  K.low = true; K.fmt = n => (n / 10).toFixed(1) + 's'; const sz = fit(5, 64, 110); let nx = 1, t = 0, on = false;
   const info = A.el('div', 'msg', 'Toque de 1 a 25 em ordem, o mais rápido possível!', K.root), box = A.el('div', 'board', null, K.root); box.style.cssText = `grid-template-columns:repeat(5,${sz}px);gap:6px`;
   A.shuffle(Array.from({ length: 25 }, (_, i) => i + 1)).forEach(v => { const b = A.el('button', 'cellb', v, box); b.style.cssText = `width:${sz}px;height:${sz}px;font-size:${sz * .42}px`; b.onclick = () => {
     if (!on) { on = true; K.every(() => K.setScore(++t), 100); } if (v != nx) return A.sfx('hit'); b.style.background = '#3a9d5d'; b.style.opacity = .5; A.sfx('click'); nx++; info.textContent = 'Próximo: ' + nx; if (nx > 25) { A.fx.confetti(120, true); K.over('Concluído! ⚡', t); } }; });

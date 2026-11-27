@@ -86,6 +86,7 @@ Arcadia.cats = {
     ['rps',        'Pedra, Papel e Tesoura', 'tabuleiro','✂️', 'Faça a maior sequência de vitórias contra a CPU.', 'Escolha sua jogada.', 'board'],
     ['battleship', 'Batalha Naval',         'tabuleiro', '🚢', 'Afunde a frota escondida com o mínimo de tiros.', 'Clique nas casas para atirar.', 'board'],
     ['mancala',    'Mancala',               'tabuleiro', '🥜', 'O jogo de sementes milenar contra a IA.', 'Clique numa cova da sua linha (embaixo).', 'board'],
+    ['chess',      'Xadrez',                'tabuleiro', '♟️', 'Xadrez completo com IA em 3 níveis, histórico, animações e promoção.', 'Clique numa peça e depois na casa de destino. No 2 jogadores, as brancas começam.', 'board'],
 
     /* --------------------------- PALAVRAS & MENTE ------------------------- */
     ['wordle',     'Termo',                 'mente',     '🔤', 'Descubra a palavra de 5 letras em 6 tentativas.', 'Digite ou use o teclado na tela.', 'mente'],
@@ -119,7 +120,7 @@ Arcadia.cats = {
     ['coinflip',   'Cara ou Coroa',         'cartas',    '🪙', 'Quantas vezes seguidas você acerta a moeda?', 'Escolha cara ou coroa.', 'cards'],
     ['roulette',   'Roleta',                'cartas',    '🎡', 'Roleta europeia de verdade: gire a roda e aposte na cor, par ou número.', 'Escolha a ficha, toque nas casas para apostar e gire a roda.', 'cards'],
     ['dados',      'Dados Poker',           'cartas',    '🎲', 'Role 5 dados em 3D e monte a melhor combinação.', 'Role, toque nos dados para segurar e escolha a categoria.', 'cards'],
-    ['solitaire',  'Paciência (Klondike)',  'cartas',    '🃏', 'Monte as quatro fundações em uma campanha de 40 fases.', 'Toque na carta e depois no destino. Z desfaz e R reinicia a fase.', 'cards'],
+    ['solitaire',  'Paciência (Klondike)',  'cartas',    '🃏', 'Monte as quatro fundações em uma campanha de 40 fases.', 'Toque na carta e depois no destino. Z desfaz e R reinicia a fase.', 'cards', 'images/gpweb.png'],
 
     /* --------------------------- ESPORTES & CORRIDA ----------------------- */
     ['football',   'Futebol de Campo',       'esportes',  '⚽', 'Estádio animado, goleiros com defesa e chute carregado. 1P, 2P ou campeonato.', 'WASD move o J1; setas movem o J2. Segure Espaço/Enter para carregar o chute. Shift corre.', 'sports'],
@@ -129,7 +130,7 @@ Arcadia.cats = {
   /* Converte as linhas em objetos nomeados. Isso deixa o restante do código
      mais legível: game.id, game.name, game.cat etc. */
   Arcadia.catalog = catalogRows.map(
-    ([id, name, cat, icon, desc, how, file]) => ({ id, name, cat, icon, desc, how, file })
+    ([id, name, cat, icon, desc, how, file, image]) => ({ id, name, cat, icon, desc, how, file, image })
   );
 })();
 
@@ -184,6 +185,7 @@ Arcadia.rules = {
   rps: 'Escolha pedra, papel ou tesoura. Pedra vence tesoura, tesoura vence papel e papel vence pedra. Cada vitória aumenta sua sequência; uma derrota encerra a partida.',
   battleship: 'A frota inimiga está escondida no tabuleiro. Clique nas casas para atirar e afundar todos os navios. Cada tiro errado conta; use os acertos para deduzir as posições.',
   mancala: 'Semeie as pedras das suas covas no sentido anti-horário. Ao terminar na sua reserva, você joga de novo. Quando uma cova sua fica vazia, você captura as pedras da cova oposta. Vence quem tiver mais pedras na reserva.',
+  chess: 'Xadrez completo: peões, cavalos, bispos, torres, dama e rei, com roque, en passant e promoção. Clique numa peça para ver as casas legais e depois no destino. No modo 1 jogador você enfrenta a IA — escolha Fácil, Normal ou Difícil nos Ajustes. O painel abaixo do tabuleiro mostra o histórico em notação, as peças capturadas, o material e o xeque. Use ↶ Desfazer (ou a tecla U) para voltar uma jogada. No 2 jogadores, as brancas começam. Vença por xeque-mate.',
   wordle: 'Descubra a palavra secreta de 5 letras em 6 tentativas. Verde = letra certa na posição certa; amarelo = letra certa na posição errada; cinza = letra ausente. A palavra muda a cada partida.',
   hangman: 'Adivinhe a palavra secreta uma letra por vez. Cada erro desenha uma parte do boneco. Você perde ao completar o boneco; acerte a palavra para vencer.',
   anagram: 'Reorganize as letras embaralhadas para formar a palavra correta. Digite a resposta e confirme antes do tempo acabar. Palavras maiores valem mais pontos.',
@@ -224,6 +226,7 @@ Arcadia.features = {
   tictactoe: { players: true, difficulty: true },
   connect4:  { players: true, difficulty: true },
   reversi:   { players: true, difficulty: true },
+  chess:     { players: true, difficulty: true },
   football:  { players: true, difficulty: true, minutes: true, tournament: true, weather: true },
   moto:      { difficulty: true, laps: true, traffic: true }
 };
@@ -267,7 +270,8 @@ Arcadia.rankFormat = {
   typing: n => n + ' ppm',
   cps: n => n + ' cliques',
   cookie: n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n),
-  football: n => n + ' gols'
+  football: n => n + ' gols',
+  chess: n => n + ' pts'
 };
 
 /* Faixas plausíveis para os rivais do ranking. Quando o jogador já tem um
@@ -285,7 +289,7 @@ Arcadia.rankRanges = {
   hanoi: [15, 80], pegs: [15, 45], sudoku: [300, 1200], match3: [400, 4000],
   colorsort: [25, 90], sokoban: [60, 300], wordsearch: [120, 500],
   tictactoe: [1, 12], connect4: [1, 10], reversi: [10, 60], mastermind: [4, 10],
-  rps: [1, 12], battleship: [25, 80], mancala: [20, 48], wordle: [1, 10],
+  rps: [1, 12], battleship: [25, 80], mancala: [20, 48], chess: [0, 80], wordle: [1, 10],
   hangman: [1, 10], anagram: [20, 200], typing: [25, 80], mathrush: [10, 150],
   guess: [4, 10], quiz: [1, 10], flags: [1, 30], whackmole: [5, 60],
   cps: [60, 140], reaction: [180, 450], aim: [10, 120], stroop: [10, 100],
@@ -296,49 +300,59 @@ Arcadia.rankRanges = {
   solitaire: [70, 180], football: [0, 10], moto: [500, 8000]
 };
 
-/* Baralhos da Paciência. O preço é pago com as moedas ganhas ao concluir
-   fases. Cada tema define o verso e a face das cartas. */
+/* Baralhos da Paciência. Cada tema tem um fundo próprio (nada de preto) com a
+   arte oficial do GPWeb em PNG transparente por cima. O preço é pago com as
+   moedas do próprio jogo. */
+const GPWEB_BACK = 'url(../images/gpweb.png) center 44%/66% no-repeat, ';
+/* Cada baralho tem um fundo colorido próprio (nunca preto chapado): o brilho
+   superior dá profundidade, a diagonal define a cor do tema e a sombra final
+   mantém a leitura das cartas. A marca GPWEB fica por cima, em PNG transparente. */
+const deckBack = (light, mid, deep) =>
+  GPWEB_BACK +
+  'radial-gradient(circle at 50% 18%,rgba(255,255,255,.24),transparent 46%),' +
+  'linear-gradient(155deg,' + light + ',' + mid + ' 62%,' + deep + ')';
+Arcadia.cardBack = deckBack('#3b63d8', '#1d2f86', '#0b1238');
 Arcadia.cardDecks = [
   {
     id: 'classic', name: 'Clássico', cost: 0,
     face: 'linear-gradient(155deg,#ffffff,#e8ebf6)',
-    back: 'repeating-linear-gradient(45deg,#4c3bd0,#4c3bd0 6px,#6b57ff 6px,#6b57ff 12px)',
+    back: deckBack('#3b63d8', '#1d2f86', '#0b1238'),
     ink: '#14172a', red: '#d21f3c'
   },
   {
     id: 'gold', name: 'Ouro', cost: 90,
     face: 'linear-gradient(155deg,#fff9e0,#f6df9b)',
-    back: 'repeating-linear-gradient(45deg,#8a6a1a,#8a6a1a 6px,#d4af37 6px,#d4af37 12px)',
+    back: deckBack('#e0a92a', '#8a5a10', '#3a2205'),
     ink: '#4a3210', red: '#a0122a'
   },
   {
     id: 'neon', name: 'Neon', cost: 150,
     face: 'linear-gradient(155deg,#eafffb,#c9fff4)',
-    back: 'repeating-linear-gradient(45deg,#0a6b61,#0a6b61 6px,#00e0b8 6px,#00e0b8 12px)',
+    back: deckBack('#11b9a6', '#075e58', '#022b2a'),
     ink: '#07332f', red: '#e0245e'
   },
   {
     id: 'ruby', name: 'Rubi', cost: 240,
     face: 'linear-gradient(155deg,#fff1f4,#ffd4de)',
-    back: 'repeating-linear-gradient(45deg,#7a0f2a,#7a0f2a 6px,#e0245e 6px,#e0245e 12px)',
+    back: deckBack('#e0245e', '#8c1230', '#3a0512'),
     ink: '#3a0a16', red: '#b0002a'
   },
   {
     id: 'ocean', name: 'Oceano', cost: 360,
     face: 'linear-gradient(155deg,#eff8ff,#c7e6ff)',
-    back: 'repeating-linear-gradient(45deg,#0d3b66,#0d3b66 6px,#1b8cd4 6px,#1b8cd4 12px)',
+    back: deckBack('#2a8fe0', '#0d5a99', '#04233f'),
     ink: '#0a2740', red: '#c2185b'
   },
   {
     id: 'midnight', name: 'Meia-noite', cost: 480,
     face: 'linear-gradient(155deg,#dfe3ff,#aab4ff)',
-    back: 'repeating-linear-gradient(45deg,#1a1f3d,#1a1f3d 6px,#4c7dff 6px,#4c7dff 12px)',
+    back: deckBack('#6b54e8', '#3a2a8c', '#140d3a'),
     ink: '#101430', red: '#e0245e'
   },
   {
     id: 'forest', name: 'Floresta', cost: 600,
     face: 'linear-gradient(155deg,#f2ffe9,#c9f5b8)',
-    back: 'repeating-linear-gradient(45deg,#1e5b2a,#1e5b2a 6px,#3ddc84 6px,#3ddc84 12px)',
+    back: deckBack('#35b85e', '#1c6b3a', '#062413'),
     ink: '#133018', red: '#c2185b'
   }
 ];

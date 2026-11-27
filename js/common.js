@@ -145,9 +145,8 @@
         if (level >= total) return false;
         level++;
         save();
-        /* Moedas de recompensa por fase concluída (usadas na loja de baralhos
-           da Paciência e como incentivo geral de progressão). */
-        A.wallet.add(12 + level * 2);
+        /* Recompensa em moedas do PRÓPRIO jogo. Não existe carteira global. */
+        if (A.economy && A.activeGame) A.economy.earn(A.activeGame, 12 + level * 2, 'silent');
         /* Ao concluir uma fase, sempre mostramos a tela de transição: o jogador
            escolhe continuar para a próxima ou voltar ao menu do jogo. */
         if (K.phaseGate) {
@@ -177,7 +176,7 @@
       finish(message, score) {
         completed = true;
         save();
-        A.wallet.add(150);
+        if (A.economy && A.activeGame) A.economy.earn(A.activeGame, 150, 'silent');
         K.over(message || 'Campanha completa! 🏆', score == null ? K.score : score);
       }
     };
@@ -561,48 +560,11 @@
   };
 
   /* ===========================================================================
-     MOEDAS (carteira compartilhada)
+     MOEDAS
      ---------------------------------------------------------------------------
-     Ganhas ao concluir fases e gastas na loja de baralhos da Paciência.
-     O saldo fica salvo no navegador, como o restante do progresso.
+     Não existe carteira global. Cada jogo tem a própria carteira em
+     js/economy.js (`arc:econ:<id>`) e só ela pode ser usada na loja daquele jogo.
      =========================================================================== */
-  const coinToast = amount => {
-    if (typeof document === 'undefined') return;
-    const toast = document.createElement('div');
-    toast.className = 'coin-toast';
-    toast.innerHTML = `🪙 <b>+${amount}</b>`;
-    const host = document.fullscreenElement || document.body;
-    host.appendChild(toast);
-    setTimeout(() => toast.remove(), 1600);
-  };
-
-  A.wallet = {
-    get() {
-      return Math.max(0, Math.floor(Number(store.get('coins', 0)) || 0));
-    },
-    set(value) {
-      store.set('coins', Math.max(0, Math.floor(Number(value) || 0)));
-      return A.wallet.get();
-    },
-    add(amount, options) {
-      const gain = Math.max(0, Math.floor(Number(amount) || 0));
-      const total = A.wallet.set(A.wallet.get() + gain);
-      if (gain && !(options && options.silent)) coinToast(gain);
-      return total;
-    },
-    spend(amount) {
-      const cost = Math.max(0, Math.floor(Number(amount) || 0));
-      if (A.wallet.get() < cost) return false;
-      A.wallet.set(A.wallet.get() - cost);
-      return true;
-    },
-    fmt(value) {
-      const n = Number(value) || 0;
-      return n >= 1e6 ? (n / 1e6).toFixed(2) + 'M'
-        : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k'
-        : String(Math.floor(n));
-    }
-  };
 
   /* ===========================================================================
      JOGADOR E RANKING
